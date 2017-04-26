@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\..\main.cpp" />
+    <ClCompile Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.cpp">
+      <Filter>GLE</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\RollingShutterRasteriser.cpp">
+      <Filter>RollingShutterRasterisation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
+    <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.h">
+      <Filter>GLE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE_GL.h">
+      <Filter>GLE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\RollingShutterRasteriser.h">
+      <Filter>RollingShutterRasterisation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\renderdoc_app.h" />
+    <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="GLE">
+      <UniqueIdentifier>{350d0df2-6c96-486d-82d9-786aa05d811b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RollingShutterRasterisation">
+      <UniqueIdentifier>{1417efbe-ca42-41ea-a25d-329c78a71695}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RollingShutterRasterisation\GLSL">
+      <UniqueIdentifier>{5c6f90ed-a55f-4544-af61-0445b78a413f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DFragment.glsl">
+      <Filter>RollingShutterRasterisation\GLSL</Filter>
+    </None>
+    <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DGeometry.glsl">
+      <Filter>RollingShutterRasterisation\GLSL</Filter>
+    </None>
+    <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DVertex.glsl">
+      <Filter>RollingShutterRasterisation\GLSL</Filter>
+    </None>
+  </ItemGroup>
+</Project>
