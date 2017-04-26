@@ -28,6 +28,7 @@ limitations under the License.
 // Include the Oculus SDK
 #include "OVR_CAPI_GL.h"
 #include "RollingShutterRasteriser.h"
+#include "TraditionalRasteriser.h"
 
 #include "renderdoc_app.h"
 
@@ -201,6 +202,7 @@ static bool MainLoop(bool retryCreate)
     roomScene = new Scene(false);
 
 	RollingShutterRasteriser* rollingShutterRasteriser = new RollingShutterRasteriser(idealTextureSize);
+	TraditionalRasteriser* traditionalRasteriser = new TraditionalRasteriser();
 
 	//model->SetTexture("C:\\OculusSDK\\Samples\\OculusRoomTiny\\OculusRoomTiny (GL)\\texture.bmp");
 
@@ -272,8 +274,7 @@ static bool MainLoop(bool retryCreate)
 
 				if (!enableRollingShutter) {
 					// Render world (regular rasterisation)
-					glEnable(GL_CULL_FACE);
-					roomScene->Render(prediction0.GetView(eye), proj);
+					traditionalRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
 				}
 				else {
 					// Rolling Shutter Rasterisation

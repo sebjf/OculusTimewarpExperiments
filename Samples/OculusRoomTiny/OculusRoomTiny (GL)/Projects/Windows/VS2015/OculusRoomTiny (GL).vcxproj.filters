@@ -9,6 +9,7 @@
       <Filter>RollingShutterRasterisation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp" />
+    <ClCompile Include="..\..\..\TraditionalRasteriser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
@@ -23,6 +24,7 @@
     </ClInclude>
     <ClInclude Include="..\..\..\renderdoc_app.h" />
     <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h" />
+    <ClInclude Include="..\..\..\TraditionalRasteriser.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GLE">

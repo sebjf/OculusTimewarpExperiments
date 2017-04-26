@@ -23,6 +23,7 @@
     <ClCompile Include="..\..\..\main.cpp" />
     <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp" />
     <ClCompile Include="..\..\..\RollingShutterRasteriser.cpp" />
+    <ClCompile Include="..\..\..\TraditionalRasteriser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.h" />
@@ -31,6 +32,7 @@
     <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h" />
     <ClInclude Include="..\..\..\renderdoc_app.h" />
     <ClInclude Include="..\..\..\RollingShutterRasteriser.h" />
+    <ClInclude Include="..\..\..\TraditionalRasteriser.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DFragment.glsl" />
