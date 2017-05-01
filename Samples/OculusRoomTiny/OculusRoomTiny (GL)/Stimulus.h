@@ -6,16 +6,14 @@
 
 struct Character
 {
-	char code;
+	uint8_t code;
 	float acuity;
-	char data[512 * 512 * 1];
+	GLuint textureId;
 };
 
 struct Characterset
 {
-	unsigned int numCharacters;
 	unsigned int textureWidth;
-	Character* characters;
 };
 
 class Stimulus
@@ -42,7 +40,7 @@ public:
 
 	int GetCharacterTexture(int i)
 	{
-		return textureids[i % textureids.size()];
+		return characters[i % characters.size()].textureId;
 	}
 
 	float speed1;
@@ -56,9 +54,8 @@ public:
 private:
 	float clock1;
 	float clock2;
-	std::vector<char> charactersetdata;
-	Characterset* characterset;
-	std::vector<GLuint> textureids;
+	Characterset characterset;
+	std::vector<Character> characters;
 
 	void Load();
 };

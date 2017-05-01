@@ -301,7 +301,9 @@ static bool MainLoop(bool retryCreate)
 					// Rolling Shutter Rasterisation
 					rollingShutterRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
 				}
+
 				if (enableClearScreen) {
+					// draws white quads to the screen so we can clearly identify bounds
 					CLEAR();
 				}
 

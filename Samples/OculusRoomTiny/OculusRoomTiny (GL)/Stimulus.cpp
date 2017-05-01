@@ -21,14 +21,27 @@ static std::vector<char> ReadAllBytes(char const* filename)
 
 void Stimulus::Load()
 {
-	charactersetdata = ReadAllBytes("./charactersets.bin");
-	characterset = (Characterset*)charactersetdata.data();
-	assert(characterset->textureWidth == 512);
+	ifstream ifs("./charactersets.bin", ios::binary | ios::in);
 
-	characterset->characters = (Character*)(charactersetdata.data() + (sizeof(unsigned int) * 2));
+	assert(ifs.is_open());
 
-	for (size_t i = 0; i < characterset->numCharacters; i++)
+	uint32_t numCharacters;
+	ifs.read(reinterpret_cast<char *>(&numCharacters), sizeof(uint32_t));
+	ifs.read(reinterpret_cast<char *>(&characterset.textureWidth), sizeof(uint32_t));
+
+	assert(characterset.textureWidth == 512);
+
+	int datalength = characterset.textureWidth * characterset.textureWidth;
+	char* data = new char[datalength];
+
+	for (size_t i = 0; i < numCharacters; i++)
 	{
+		Character character;
+
+		ifs.read(reinterpret_cast<char *>(&character.code), sizeof(uint8_t));
+		ifs.read(reinterpret_cast<char *>(&character.acuity), sizeof(float));
+		ifs.read(data, datalength);
+
 		// Create one OpenGL texture
 		GLuint textureID;
 		glGenTextures(1, &textureID);
@@ -41,12 +54,12 @@ void Stimulus::Load()
 			GL_TEXTURE_2D, 
 			0, 
 			GL_R8_SNORM, 
-			characterset->textureWidth, 
-			characterset->textureWidth, 
+			characterset.textureWidth, 
+			characterset.textureWidth, 
 			0, 
 			GL_RED, 
 			GL_UNSIGNED_BYTE, 
-			characterset->characters[i].data);
+			data);
 		
 		// Poor filtering, or ...
 		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -59,6 +72,10 @@ void Stimulus::Load()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
 		glGenerateMipmap(GL_TEXTURE_2D);
 
-		textureids.push_back(textureID);
+		character.textureId = textureID;
+		characters.push_back(character);
 	}
+
+	delete data;
+	ifs.close();
 }

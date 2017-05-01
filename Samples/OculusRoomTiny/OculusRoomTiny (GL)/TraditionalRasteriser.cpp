@@ -116,6 +116,8 @@ void TraditionalRasteriser::Render(Model* model, ovrMatrix4f view0, ovrMatrix4f 
 	glVertexAttribPointer(colorLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, C));
 	glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, U));
 
+	glDisable(GL_CULL_FACE);
+
 	glDrawElements(GL_TRIANGLES, model->numIndices, GL_UNSIGNED_SHORT, NULL);
 
 	glDisableVertexAttribArray(posLoc);
