@@ -39,22 +39,3 @@ protected:
 	bool useRaytracing;
 };
 
-struct Texture;
-
-class RollingShutterModel : public RollingShutterRasteriser, public Model
-{
-public:
-	RollingShutterModel(ShaderFill* fill, ovrSizei fb) : Model(ovrVector3f(), fill), RollingShutterRasteriser(fb)
-	{
-		m_resolution.x = fb.w;
-		m_resolution.y = fb.h;
-		texture = NULL;
-	}
-
-	virtual void Render(ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection);
-
-	void SetTexture(const char* filename);
-
-private:
-	Texture* texture;
-};

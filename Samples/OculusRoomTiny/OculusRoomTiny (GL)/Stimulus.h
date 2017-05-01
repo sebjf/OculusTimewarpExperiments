@@ -42,7 +42,7 @@ public:
 
 	int GetCharacterTexture(int i)
 	{
-		return textureids[i];
+		return textureids[i % textureids.size()];
 	}
 
 	float speed1;

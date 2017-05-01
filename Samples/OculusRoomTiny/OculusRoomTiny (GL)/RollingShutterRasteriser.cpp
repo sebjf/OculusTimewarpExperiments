@@ -201,13 +201,3 @@ struct Texture
 	}
 
 };
-
-void RollingShutterModel::Render(ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection)
-{
-	RollingShutterRasteriser::Render(this, view0, view1, projection);
-}
-
-void RollingShutterModel::SetTexture(const char* filename)
-{
-	texture = new Texture(filename);
-}

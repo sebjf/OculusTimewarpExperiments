@@ -489,51 +489,6 @@ struct OGL
 // Global OpenGL state
 static OGL Platform;
 
-//------------------------------------------------------------------------------
-struct ShaderFill
-{
-    GLuint            program;
-    TextureBuffer   * texture;
-
-    ShaderFill(GLuint vertexShader, GLuint pixelShader, TextureBuffer* _texture)
-    {
-        texture = _texture;
-
-        program = glCreateProgram();
-
-        glAttachShader(program, vertexShader);
-        glAttachShader(program, pixelShader);
-
-        glLinkProgram(program);
-
-        glDetachShader(program, vertexShader);
-        glDetachShader(program, pixelShader);
-
-        GLint r;
-        glGetProgramiv(program, GL_LINK_STATUS, &r);
-        if (!r)
-        {
-            GLchar msg[1024];
-            glGetProgramInfoLog(program, sizeof(msg), 0, msg);
-            OVR_DEBUG_LOG(("Linking shaders failed: %s\n", msg));
-        }
-    }
-
-    ~ShaderFill()
-    {
-        if (program)
-        {
-            glDeleteProgram(program);
-            program = 0;
-        }
-        if (texture)
-        {
-            delete texture;
-            texture = nullptr;
-        }
-    }
-};
-
 //----------------------------------------------------------------
 struct VertexBuffer
 {
@@ -592,21 +547,21 @@ struct Model
     int             numVertices, numIndices;
     Vertex          Vertices[2000]; // Note fixed maximum
     GLushort        Indices[2000];
-    ShaderFill    * Fill;
     VertexBuffer  * vertexBuffer;
     IndexBuffer   * indexBuffer;
+	TextureBuffer * textureBuffer;
 	int				textureId;
 
-    Model(Vector3f pos, ShaderFill * fill) :
-        numVertices(0),
-        numIndices(0),
-        Pos(pos),
-        Rot(),
-        Mat(),
-        Fill(fill),
-        vertexBuffer(nullptr),
-        indexBuffer(nullptr)
-    {}
+	Model(Vector3f pos, TextureBuffer * tex) :
+		numVertices(0),
+		numIndices(0),
+		Pos(pos),
+		Rot(),
+		Mat(),
+		vertexBuffer(nullptr),
+		indexBuffer(nullptr),
+		textureBuffer(tex)
+	{}
 
     ~Model()
     {
@@ -615,9 +570,9 @@ struct Model
 
 	GLuint getTextureId()
 	{
-		if (Fill != NULL)
+		if (textureBuffer != NULL)
 		{
-			return Fill->texture->texId;
+			return textureBuffer->texId;
 		}
 		
 		return textureId;
@@ -695,44 +650,6 @@ struct Model
             AddVertex(vvv);
         }
     }
-
-    virtual void Render(Matrix4f view, Matrix4f proj)
-    {
-        Matrix4f combined = proj * view * GetMatrix();
-
-        glUseProgram(Fill->program);
-        glUniform1i(glGetUniformLocation(Fill->program, "Texture0"), 0);
-        glUniformMatrix4fv(glGetUniformLocation(Fill->program, "matWVP"), 1, GL_TRUE, (FLOAT*)&combined);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, Fill->texture->texId);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer->buffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->buffer);
-
-        GLuint posLoc = glGetAttribLocation(Fill->program, "Position");
-        GLuint colorLoc = glGetAttribLocation(Fill->program, "Color");
-        GLuint uvLoc = glGetAttribLocation(Fill->program, "TexCoord");
-
-        glEnableVertexAttribArray(posLoc);
-        glEnableVertexAttribArray(colorLoc);
-        glEnableVertexAttribArray(uvLoc);
-
-        glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)OVR_OFFSETOF(Vertex, Pos));
-        glVertexAttribPointer(colorLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), (void*)OVR_OFFSETOF(Vertex, C));
-        glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)OVR_OFFSETOF(Vertex, U));
-
-        glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_SHORT, NULL);
-
-        glDisableVertexAttribArray(posLoc);
-        glDisableVertexAttribArray(colorLoc);
-        glDisableVertexAttribArray(uvLoc);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-        glUseProgram(0);
-    }
 };
 
 //------------------------------------------------------------------------- 
@@ -746,68 +663,10 @@ struct Scene
         Models[numModels++] = n;
     }
 
-    void Render(Matrix4f view, Matrix4f proj)
-    {
-        for (int i = 0; i < numModels; ++i)
-            Models[i]->Render(view, proj);
-    }
-
-    GLuint CreateShader(GLenum type, const GLchar* src)
-    {
-        GLuint shader = glCreateShader(type);
-
-        glShaderSource(shader, 1, &src, NULL);
-        glCompileShader(shader);
-
-        GLint r;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &r);
-        if (!r)
-        {
-            GLchar msg[1024];
-            glGetShaderInfoLog(shader, sizeof(msg), 0, msg);
-            if (msg[0]) {
-                OVR_DEBUG_LOG(("Compiling shader failed: %s\n", msg));
-            }
-            return 0;
-        }
-
-        return shader;
-    }
-
     void Init(int includeIntensiveGPUobject)
     {
-        static const GLchar* VertexShaderSrc =
-            "#version 150\n"
-            "uniform mat4 matWVP;\n"
-            "in      vec4 Position;\n"
-            "in      vec4 Color;\n"
-            "in      vec2 TexCoord;\n"
-            "out     vec2 oTexCoord;\n"
-            "out     vec4 oColor;\n"
-            "void main()\n"
-            "{\n"
-            "   gl_Position = (matWVP * Position);\n"
-            "   oTexCoord   = TexCoord;\n"
-            "   oColor.rgb  = pow(Color.rgb, vec3(2.2));\n"   // convert from sRGB to linear
-            "   oColor.a    = Color.a;\n"
-            "}\n";
-
-        static const char* FragmentShaderSrc =
-            "#version 150\n"
-            "uniform sampler2D Texture0;\n"
-            "in      vec4      oColor;\n"
-            "in      vec2      oTexCoord;\n"
-            "out     vec4      FragColor;\n"
-            "void main()\n"
-            "{\n"
-            "   FragColor = oColor * texture2D(Texture0, oTexCoord);\n"
-            "}\n";
-
-        GLuint    vshader = CreateShader(GL_VERTEX_SHADER, VertexShaderSrc);
-        GLuint    fshader = CreateShader(GL_FRAGMENT_SHADER, FragmentShaderSrc);
-
         // Make textures
-        ShaderFill * grid_material[5];
+		TextureBuffer* grid_texture[5];
         for (int k = 0; k < 5; ++k)
         {
             static DWORD tex_pixels[256 * 256];
@@ -823,20 +682,16 @@ struct Scene
 					if (k == 4) tex_pixels[j * 256 + i] = 0xffff00ff;// blank 2
                 }
             }
-            TextureBuffer * generated_texture = new TextureBuffer(nullptr, false, false, Sizei(256, 256), 4, (unsigned char *)tex_pixels, 1);
-            grid_material[k] = new ShaderFill(vshader, fshader, generated_texture);
+			grid_texture[k] = new TextureBuffer(nullptr, false, false, Sizei(256, 256), 4, (unsigned char *)tex_pixels, 1);
         }
 
-        glDeleteShader(vshader);
-        glDeleteShader(fshader);
-
         // Construct geometry
-        Model * m = new Model(Vector3f(0, 0, 0), grid_material[4]);  // Moving box
+        Model * m = new Model(Vector3f(0, 0, 0), grid_texture[4]);  // Moving box
         m->AddSolidColorBox(-.75f, -0.25f, -.75f, .75f, 0.25f, .75f, 0xff404040);
         m->AllocateBuffers();
         Add(m);
 
-        m = new Model(Vector3f(0, 0, 0), grid_material[1]);  // Walls
+        m = new Model(Vector3f(0, 0, 0), grid_texture[1]);  // Walls
         m->AddSolidColorBox(-10.1f, 0.0f, -20.0f, -10.0f, 4.0f, 20.0f, 0xff808080); // Left Wall
         m->AddSolidColorBox(-10.0f, -0.1f, -20.1f, 10.0f, 4.0f, -20.0f, 0xff808080); // Back Wall
         m->AddSolidColorBox(10.0f, -0.1f, -20.0f, 10.1f, 4.0f, 20.0f, 0xff808080); // Right Wall
@@ -845,25 +700,25 @@ struct Scene
 
         if (includeIntensiveGPUobject)
         {
-            m = new Model(Vector3f(0, 0, 0), grid_material[0]);  // Floors
+            m = new Model(Vector3f(0, 0, 0), grid_texture[0]);  // Floors
             for (float depth = 0.0f; depth > -3.0f; depth -= 0.1f)
                 m->AddSolidColorBox(9.0f, 0.5f, -depth, -9.0f, 3.5f, -depth, 0x10ff80ff); // Partition
             m->AllocateBuffers();
             Add(m);
         }
 
-        m = new Model(Vector3f(0, 0, 0), grid_material[0]);  // Floors
+        m = new Model(Vector3f(0, 0, 0), grid_texture[0]);  // Floors
         m->AddSolidColorBox(-10.0f, -0.1f, -20.0f, 10.0f, 0.0f, 20.1f, 0xff808080); // Main floor
      //   m->AddSolidColorBox(-15.0f, -6.1f, 18.0f, 15.0f, -6.0f, 30.0f, 0xff808080); // Bottom floor
         m->AllocateBuffers();
         Add(m);
 
-        m = new Model(Vector3f(0, 0, 0), grid_material[2]);  // Ceiling
+        m = new Model(Vector3f(0, 0, 0), grid_texture[2]);  // Ceiling
         m->AddSolidColorBox(-10.0f, 4.0f, -20.0f, 10.0f, 4.1f, 20.1f, 0xff808080);
         m->AllocateBuffers();
         Add(m);
 
-        m = new Model(Vector3f(0, 0, 0), grid_material[3]);  // Fixtures & furniture
+        m = new Model(Vector3f(0, 0, 0), grid_texture[3]);  // Fixtures & furniture
         m->AddSolidColorBox(9.5f, 0.75f, 3.0f, 10.1f, 2.5f, 3.1f, 0xff383838);   // Right side shelf// Verticals
         m->AddSolidColorBox(9.5f, 0.95f, 3.7f, 10.1f, 2.75f, 3.8f, 0xff383838);   // Right side shelf
         m->AddSolidColorBox(9.55f, 1.20f, 2.5f, 10.1f, 1.30f, 3.75f, 0xff383838); // Right side shelf// Horizontals
