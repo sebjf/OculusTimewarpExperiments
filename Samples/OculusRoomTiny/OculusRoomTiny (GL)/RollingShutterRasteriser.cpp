@@ -10,14 +10,19 @@
 
 #include "OpenGL_3_2_Utils\TextureLoader.h"
 
-
+#define ERRORMSG(msg) MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK);
 
 std::string readFile(const char *filePath) {
 	std::string content;
 	std::ifstream fileStream(filePath, std::ios::in);
 
 	if (!fileStream.is_open()) {
-		std::cerr << "Could not read file " << filePath << ". File does not exist." << std::endl;
+		int currentdirlength = GetCurrentDirectory(0, NULL);
+		TCHAR* currentdir = new TCHAR[currentdirlength];
+		GetCurrentDirectory(currentdirlength, currentdir);
+		auto errorstring = std::string("Could not read file ") + std::string(currentdir) + std::string(filePath) + std::string(". File does not exist.");
+		delete currentdir;
+		ERRORMSG(errorstring.c_str());
 		return "";
 	}
 
@@ -60,9 +65,9 @@ GLuint LoadShader(GLenum type, const char* filename)
 
 RollingShutterRasteriser::RollingShutterRasteriser(ovrSizei fb)
 {
-	vertexShader   = LoadShader(GL_VERTEX_SHADER,   "C:\\OculusSDK\\Samples\\OculusRoomTiny\\OculusRoomTiny (GL)\\GLSL\\RollingShutterRasterizationTexture2DVertex.glsl");
-	geometryShader = LoadShader(GL_GEOMETRY_SHADER, "C:\\OculusSDK\\Samples\\OculusRoomTiny\\OculusRoomTiny (GL)\\GLSL\\RollingShutterRasterizationTexture2DGeometry.glsl");
-	fragmentShader = LoadShader(GL_FRAGMENT_SHADER, "C:\\OculusSDK\\Samples\\OculusRoomTiny\\OculusRoomTiny (GL)\\GLSL\\RollingShutterRasterizationTexture2DFragment.glsl");
+	vertexShader   = LoadShader(GL_VERTEX_SHADER,   "./GLSL/RollingShutterRasterizationTexture2DVertex.glsl");
+	geometryShader = LoadShader(GL_GEOMETRY_SHADER, "./GLSL/RollingShutterRasterizationTexture2DGeometry.glsl");
+	fragmentShader = LoadShader(GL_FRAGMENT_SHADER, "./GLSL/RollingShutterRasterizationTexture2DFragment.glsl");
 	
 	program = glCreateProgram();
 	glAttachShader(program, vertexShader);
@@ -145,7 +150,7 @@ void RollingShutterRasteriser::Render(Model* model, ovrMatrix4f view0, ovrMatrix
 
 	glUniform1i(glGetUniformLocation(getProgram(), "Texture0"), 0);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, model->Fill->texture->texId);
+	glBindTexture(GL_TEXTURE_2D, model->getTextureId());
 
 	glEnableVertexAttribArray(posLoc);
 	glEnableVertexAttribArray(colorLoc);

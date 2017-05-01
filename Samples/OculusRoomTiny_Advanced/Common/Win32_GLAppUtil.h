@@ -413,7 +413,7 @@ struct OGL
         OVR::GLEContext::SetCurrentContext(&GLEContext);
         GLEContext.Init();
 
-		
+	
         glGenFramebuffers(1, &fboId);
 
         glEnable(GL_DEPTH_TEST);
@@ -433,6 +433,7 @@ struct OGL
             // Explicitly disable notification severity output.
             glDebugMessageControlARB(GL_DEBUG_SOURCE_API, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
         }
+		
 		
 
         return true;
@@ -594,6 +595,7 @@ struct Model
     ShaderFill    * Fill;
     VertexBuffer  * vertexBuffer;
     IndexBuffer   * indexBuffer;
+	int				textureId;
 
     Model(Vector3f pos, ShaderFill * fill) :
         numVertices(0),
@@ -610,6 +612,16 @@ struct Model
     {
         FreeBuffers();
     }
+
+	GLuint getTextureId()
+	{
+		if (Fill != NULL)
+		{
+			return Fill->texture->texId;
+		}
+		
+		return textureId;
+	}
 
     Matrix4f& GetMatrix()
     {
@@ -795,8 +807,8 @@ struct Scene
         GLuint    fshader = CreateShader(GL_FRAGMENT_SHADER, FragmentShaderSrc);
 
         // Make textures
-        ShaderFill * grid_material[4];
-        for (int k = 0; k < 4; ++k)
+        ShaderFill * grid_material[5];
+        for (int k = 0; k < 5; ++k)
         {
             static DWORD tex_pixels[256 * 256];
             for (int j = 0; j < 256; ++j)
@@ -808,6 +820,7 @@ struct Scene
                         ? 0xff3c3c3c : 0xffb4b4b4;// wall
                     if (k == 2) tex_pixels[j * 256 + i] = (i / 4 == 0 || j / 4 == 0) ? 0xff505050 : 0xffb4b4b4;// ceiling
                     if (k == 3) tex_pixels[j * 256 + i] = 0xffffffff;// blank
+					if (k == 4) tex_pixels[j * 256 + i] = 0xffff00ff;// blank 2
                 }
             }
             TextureBuffer * generated_texture = new TextureBuffer(nullptr, false, false, Sizei(256, 256), 4, (unsigned char *)tex_pixels, 1);
@@ -818,8 +831,8 @@ struct Scene
         glDeleteShader(fshader);
 
         // Construct geometry
-        Model * m = new Model(Vector3f(0, 0, 0), grid_material[2]);  // Moving box
-        m->AddSolidColorBox(0, 0, 0, +1.0f, +1.0f, 1.0f, 0xff404040);
+        Model * m = new Model(Vector3f(0, 0, 0), grid_material[4]);  // Moving box
+        m->AddSolidColorBox(-.75f, -0.25f, -.75f, .75f, 0.25f, .75f, 0xff404040);
         m->AllocateBuffers();
         Add(m);
 

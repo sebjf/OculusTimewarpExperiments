@@ -29,46 +29,54 @@ limitations under the License.
 #include "OVR_CAPI_GL.h"
 #include "RollingShutterRasteriser.h"
 #include "TraditionalRasteriser.h"
-
 #include "renderdoc_app.h"
+#include "Stimulus.h"
+#include "RasterisationUtils.h"
+
+/* assimp include files. These three are usually needed. */
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 using namespace OVR;
 
 bool hasRenderdoc = false;
-
+long long frameIndex;
 RENDERDOC_API_1_1_1* pRenderDocAPI;
 
-void CLEAR()
+const aiScene* assimpscene = NULL;
+
+Model* ImportAssimpModel(const aiScene* scene, int meshid = 0)
 {
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
+	Model* model = new Model(Vector3f(0, 0, 0), NULL);
 
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+	auto mesh = scene->mMeshes[meshid];
 
-	glDisable(GL_TEXTURE_2D);
+	for (size_t i = 0; i < mesh->mNumFaces; i++)
+	{
+		auto face = mesh->mFaces[i];
+		assert(face.mNumIndices == 3);
+		model->AddIndex(face.mIndices[0]);
+		model->AddIndex(face.mIndices[1]);
+		model->AddIndex(face.mIndices[2]);
+	}
 
-	glBegin(GL_QUADS);
+	for (size_t i = 0; i < mesh->mNumVertices; i++)
+	{
+		Model::Vertex v;
+		v.Pos = Vector3f(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+		v.C = 0xFFFFFFFF;
+		v.U = mesh->mTextureCoords[0][i].x;
+		v.V = mesh->mTextureCoords[0][i].y;
+		model->AddVertex(v);
+	}
 
-	glColor4f(1, 1, 1, 1);
+	model->AllocateBuffers();
 
-	glTexCoord2f(0, 0);
-	glVertex2f(-1, -1);
-
-	glTexCoord2f(0, 1);
-	glVertex2f(-1, 1);
-
-	glTexCoord2f(1, 1);
-	glVertex2f(1, 1);
-
-	glTexCoord2f(1, 0);
-	glVertex2f(1, -1);
-
-	glEnd();
-
-	glEnable(GL_TEXTURE_2D);
+	return model;
 }
 
+/* Describes the predicted motion throughout an upcoming frame */
 struct Prediction
 {
 	ovrPosef EyeRenderPose[2];
@@ -89,8 +97,6 @@ struct Prediction
 		return Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + finalForward, finalUp);
 	}
 };
-
-long long frameIndex;
 
 Prediction GetPrediction(ovrSession session, ovrVector3f* HmdToEyeOffset, double timeoffset)
 {
@@ -123,6 +129,11 @@ static bool MainLoop(bool retryCreate)
 		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(hRenderDoc, "RENDERDOC_GetAPI");
 		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_1, (void**)&pRenderDocAPI);
 	}
+
+	auto stream = aiGetPredefinedLogStream(aiDefaultLogStream_STDOUT, NULL);
+	aiAttachLogStream(&stream);
+
+	assimpscene = aiImportFile("./Assets/box.obj", aiProcessPreset_TargetRealtime_MaxQuality);
 
 	Prediction prediction0;
 	Prediction prediction1;
@@ -201,16 +212,22 @@ static bool MainLoop(bool retryCreate)
     // Make scene - can simplify further if needed
     roomScene = new Scene(false);
 
+	// replace the default box with our own
+	roomScene->Models[0] = ImportAssimpModel(assimpscene, 0);
+
 	RollingShutterRasteriser* rollingShutterRasteriser = new RollingShutterRasteriser(idealTextureSize);
 	TraditionalRasteriser* traditionalRasteriser = new TraditionalRasteriser();
+	Stimulus* stimuli = new Stimulus();
 
-	//model->SetTexture("C:\\OculusSDK\\Samples\\OculusRoomTiny\\OculusRoomTiny (GL)\\texture.bmp");
-
+	stimuli->m_model = roomScene->Models[0];
 
     // FloorLevel will give tracking poses where the floor height is 0
     ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
 
 	bool enableRenderDocCapture = false;
+	bool enableTextureAdvance = false;
+
+	int character = 0;
 
     // Main loop
     while (Platform.HandleMessages())
@@ -232,11 +249,13 @@ static bool MainLoop(bool retryCreate)
 		if (Platform.Key['3'])                          enableRollingShutter = true; else enableRollingShutter = false;
 		if (Platform.Key['4'])                          enableClearScreen = true; else enableClearScreen = false;
 		if (Platform.Key['P'])							enableRenderDocCapture = true;
+		if (Platform.Key['5'])                          enableTextureAdvance = true; else enableTextureAdvance = false;
 
-		// Animate the cube
-        static float cubeClock = 0;
-        roomScene->Models[0]->Pos = Vector3f(9 * (float)sin(cubeClock), 3, 9 * (float)cos(cubeClock += 0.015f));
-		
+		if (enableTextureAdvance)
+		{
+			stimuli->m_model->textureId = stimuli->GetCharacterTexture(character++);
+		}
+
 
 	    // Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
 	    ovrEyeRenderDesc eyeRenderDesc[2];
@@ -248,6 +267,8 @@ static bool MainLoop(bool retryCreate)
                                                         eyeRenderDesc[1].HmdToEyeOffset };
 
 
+		stimuli->Update();
+
         double sensorSampleTime = 0;    // sensorSampleTime is fed into the layer later
 
 		if (!enableRenderPose) {
@@ -258,7 +279,7 @@ static bool MainLoop(bool retryCreate)
 			prediction1.worldOffset = Pos2;
 		}
 
-		if (enableRenderDocCapture)
+		if (enableRenderDocCapture && hasRenderdoc)
 		{
 			pRenderDocAPI->StartFrameCapture(NULL, NULL);
 		}
@@ -295,7 +316,7 @@ static bool MainLoop(bool retryCreate)
             }
         }
 
-		if (enableRenderDocCapture)
+		if (enableRenderDocCapture && hasRenderdoc)
 		{
 			pRenderDocAPI->EndFrameCapture(NULL, NULL);
 			enableRenderDocCapture = false;
@@ -360,7 +381,6 @@ static bool MainLoop(bool retryCreate)
 
         SwapBuffers(Platform.hDC);
 		
-    
         frameIndex++;
     }
 

@@ -40,7 +40,7 @@ static const char* FragmentShaderSrc =
 "out     vec4      FragColor;\n"
 "void main()\n"
 "{\n"
-"   FragColor = oColor * texture2D(Texture0, oTexCoord);\n"
+"   FragColor = oColor * texture2D(Texture0, oTexCoord).r;\n"
 "}\n";
 
 GLuint CreateShader(GLenum type, const GLchar* src)
@@ -99,7 +99,7 @@ void TraditionalRasteriser::Render(Model* model, ovrMatrix4f view0, ovrMatrix4f 
 	glUniformMatrix4fv(glGetUniformLocation(program, "matWVP"), 1, GL_TRUE, (FLOAT*)&combined);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, model->Fill->texture->texId);
+	glBindTexture(GL_TEXTURE_2D, model->getTextureId());
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vertexBuffer->buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->indexBuffer->buffer);

@@ -5,11 +5,18 @@
     <ClCompile Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.cpp">
       <Filter>GLE</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\RollingShutterRasteriser.cpp">
-      <Filter>RollingShutterRasterisation</Filter>
+    <ClCompile Include="..\..\..\TraditionalRasteriser.cpp">
+      <Filter>Rasterisation</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp" />
-    <ClCompile Include="..\..\..\TraditionalRasteriser.cpp" />
+    <ClCompile Include="..\..\..\RollingShutterRasteriser.cpp">
+      <Filter>Rasterisation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Stimulus.cpp">
+      <Filter>Experiment</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
@@ -19,33 +26,55 @@
     <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE_GL.h">
       <Filter>GLE</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\RollingShutterRasteriser.h">
-      <Filter>RollingShutterRasterisation</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\renderdoc_app.h" />
-    <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h" />
-    <ClInclude Include="..\..\..\TraditionalRasteriser.h" />
+    <ClInclude Include="..\..\..\TraditionalRasteriser.h">
+      <Filter>Rasterisation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\RollingShutterRasteriser.h">
+      <Filter>Rasterisation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Stimulus.h">
+      <Filter>Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\RasterisationUtils.h">
+      <Filter>Rasterisation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Log.h">
+      <Filter>Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Experiment.h">
+      <Filter>Experiment</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="GLE">
       <UniqueIdentifier>{350d0df2-6c96-486d-82d9-786aa05d811b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RollingShutterRasterisation">
-      <UniqueIdentifier>{1417efbe-ca42-41ea-a25d-329c78a71695}</UniqueIdentifier>
+    <Filter Include="Rasterisation">
+      <UniqueIdentifier>{6716169d-ccd6-4275-b013-e95e01e6efdf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RollingShutterRasterisation\GLSL">
+    <Filter Include="Rasterisation\GLSL">
       <UniqueIdentifier>{5c6f90ed-a55f-4544-af61-0445b78a413f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Experiment">
+      <UniqueIdentifier>{edb336cb-3fe7-4a53-a2ab-1d91603e8dfe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{ce253470-94c5-436b-bb52-e6eedb0e6ca3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DFragment.glsl">
-      <Filter>RollingShutterRasterisation\GLSL</Filter>
+      <Filter>Rasterisation\GLSL</Filter>
     </None>
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DGeometry.glsl">
-      <Filter>RollingShutterRasterisation\GLSL</Filter>
+      <Filter>Rasterisation\GLSL</Filter>
     </None>
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DVertex.glsl">
-      <Filter>RollingShutterRasterisation\GLSL</Filter>
+      <Filter>Rasterisation\GLSL</Filter>
     </None>
   </ItemGroup>
 </Project>

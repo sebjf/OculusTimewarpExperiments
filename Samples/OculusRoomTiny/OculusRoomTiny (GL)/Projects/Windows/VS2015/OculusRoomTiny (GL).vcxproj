@@ -23,15 +23,20 @@
     <ClCompile Include="..\..\..\main.cpp" />
     <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp" />
     <ClCompile Include="..\..\..\RollingShutterRasteriser.cpp" />
+    <ClCompile Include="..\..\..\Stimulus.cpp" />
     <ClCompile Include="..\..\..\TraditionalRasteriser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.h" />
     <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE_GL.h" />
     <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
+    <ClInclude Include="..\..\..\Experiment.h" />
+    <ClInclude Include="..\..\..\Log.h" />
     <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h" />
+    <ClInclude Include="..\..\..\RasterisationUtils.h" />
     <ClInclude Include="..\..\..\renderdoc_app.h" />
     <ClInclude Include="..\..\..\RollingShutterRasteriser.h" />
+    <ClInclude Include="..\..\..\Stimulus.h" />
     <ClInclude Include="..\..\..\TraditionalRasteriser.h" />
   </ItemGroup>
   <ItemGroup>
@@ -241,14 +246,14 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <AdditionalIncludeDirectories>$(OVRSDKROOT)LibOVR/Include/;$(OVRSDKROOT)LibOVRKernel/Src/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AssimpSDK)/include/;$(OVRSDKROOT)LibOVR/Include/;$(OVRSDKROOT)LibOVRKernel/Src/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Manifest>
       <EnableDPIAwareness>PerMonitorHighDPIAware</EnableDPIAwareness>
     </Manifest>
     <Link>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
-      <AdditionalDependencies>$(OVRSDKROOT)LibOVR/Lib/Windows/$(Platform)/$(Configuration)/VS2015/LibOVR.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(OVRSDKROOT)LibOVR/Lib/Windows/$(Platform)/$(Configuration)/VS2015/LibOVR.lib;$(AssimpSDK)lib\$(PlatformTarget)\assimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
