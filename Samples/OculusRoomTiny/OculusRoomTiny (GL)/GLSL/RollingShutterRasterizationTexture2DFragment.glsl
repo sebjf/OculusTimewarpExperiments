@@ -149,7 +149,7 @@ void main() {
 		vec2 texcoord	= INTERPOLATE_BARYCENTRIC(triTexCoords[0], triTexCoords[1], triTexCoords[2], coordBest);
 
 		gl_FragDepth = tBest / 100.0;
-		FragColor = color * texture2D(Texture0, texcoord);
+		FragColor = color * texture2D(Texture0, texcoord).x;
 
 	} else {
 		gl_FragDepth = 0.5;

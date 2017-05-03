@@ -22,7 +22,7 @@
 #include "Extras/OVR_Math.h"
 #include "OVR_CAPI_GL.h"
 #include <assert.h>
-
+#include <vector>
 
 using namespace OVR;
 
@@ -417,7 +417,7 @@ struct OGL
         glGenFramebuffers(1, &fboId);
 
         glEnable(GL_DEPTH_TEST);
-        glFrontFace(GL_CW);
+        glFrontFace(GL_CCW);
         glEnable(GL_CULL_FACE);
 
         if (UseDebugContext && GLE_ARB_debug_output)
@@ -536,31 +536,31 @@ struct Model
 {
     struct Vertex
     {
-        Vector3f  Pos;
+        Vector3f  Position;
+		Vector3f  Normal;
         DWORD     C;
         float     U, V;
     };
 
     Vector3f        Pos;
     Quatf           Rot;
+	float			Scale;
     Matrix4f        Mat;
-    int             numVertices, numIndices;
-    Vertex          Vertices[2000]; // Note fixed maximum
-    GLushort        Indices[2000];
+	std::vector<Vertex> Vertices;
+	std::vector<GLushort> Indices;
     VertexBuffer  * vertexBuffer;
     IndexBuffer   * indexBuffer;
 	TextureBuffer * textureBuffer;
 	int				textureId;
 
 	Model(Vector3f pos, TextureBuffer * tex) :
-		numVertices(0),
-		numIndices(0),
 		Pos(pos),
 		Rot(),
 		Mat(),
 		vertexBuffer(nullptr),
 		indexBuffer(nullptr),
-		textureBuffer(tex)
+		textureBuffer(tex),
+		Scale(1.0f)
 	{}
 
     ~Model()
@@ -580,18 +580,22 @@ struct Model
 
     Matrix4f& GetMatrix()
     {
+		Matrix4f MatS;
+		MatS.M[0][0] = Scale;
+		MatS.M[1][1] = Scale;
+		MatS.M[2][2] = Scale;
         Mat = Matrix4f(Rot);
-        Mat = Matrix4f::Translation(Pos) * Mat;
+        Mat = Matrix4f::Translation(Pos) * Mat * MatS;
         return Mat;
     }
 
-    void AddVertex(const Vertex& v) { Vertices[numVertices++] = v; }
-    void AddIndex(GLushort a) { Indices[numIndices++] = a; }
+    void AddVertex(const Vertex& v) { Vertices.push_back(v); }
+    void AddIndex(GLushort a) { Indices.push_back(a); }
 
     void AllocateBuffers()
     {
-        vertexBuffer = new VertexBuffer(&Vertices[0], numVertices * sizeof(Vertices[0]));
-        indexBuffer = new IndexBuffer(&Indices[0], numIndices * sizeof(Indices[0]));
+        vertexBuffer = new VertexBuffer(&Vertices[0], Vertices.size() * sizeof(Vertices[0]));
+        indexBuffer = new IndexBuffer(&Indices[0], Indices.size() * sizeof(Indices[0]));
     }
 
     void FreeBuffers()
@@ -629,16 +633,16 @@ struct Model
         };
 
         for (int i = 0; i < sizeof(CubeIndices) / sizeof(CubeIndices[0]); ++i)
-            AddIndex(CubeIndices[i] + GLushort(numVertices));
+            AddIndex(CubeIndices[i] + GLushort(Vertices.size()));
 
         // Generate a quad for each box face
         for (int v = 0; v < 6 * 4; v++)
         {
             // Make vertices, with some token lighting
-            Vertex vvv; vvv.Pos = Vert[v][0]; vvv.U = Vert[v][1].x; vvv.V = Vert[v][1].y;
-            float dist1 = (vvv.Pos - Vector3f(-2, 4, -2)).Length();
-            float dist2 = (vvv.Pos - Vector3f(3, 4, -3)).Length();
-            float dist3 = (vvv.Pos - Vector3f(-4, 3, 25)).Length();
+            Vertex vvv; vvv.Position = Vert[v][0]; vvv.U = Vert[v][1].x; vvv.V = Vert[v][1].y;
+            float dist1 = (vvv.Position - Vector3f(-2, 4, -2)).Length();
+            float dist2 = (vvv.Position - Vector3f(3, 4, -3)).Length();
+            float dist3 = (vvv.Position - Vector3f(-4, 3, 25)).Length();
             int   bri = rand() % 160;
             float B = ((c >> 16) & 0xff) * (bri + 192.0f * (0.65f + 8 / dist1 + 1 / dist2 + 4 / dist3)) / 255.0f;
             float G = ((c >>  8) & 0xff) * (bri + 192.0f * (0.65f + 8 / dist1 + 1 / dist2 + 4 / dist3)) / 255.0f;
@@ -655,36 +659,39 @@ struct Model
 //------------------------------------------------------------------------- 
 struct Scene
 {
-    int     numModels;
-    Model * Models[20];
+	std::vector<Model*> models;
+	std::vector<TextureBuffer*> grid_texture;
 
     void    Add(Model * n)
     {
-        Models[numModels++] = n;
+		models.push_back(n);
     }
+
+	void MakeTextures()
+	{
+		// Make textures
+		for (int k = 0; k < 5; ++k)
+		{
+			static DWORD tex_pixels[256 * 256];
+			for (int j = 0; j < 256; ++j)
+			{
+				for (int i = 0; i < 256; ++i)
+				{
+					if (k == 0) tex_pixels[j * 256 + i] = (((i >> 7) ^ (j >> 7)) & 1) ? 0xffb4b4b4 : 0xff505050;// floor
+					if (k == 1) tex_pixels[j * 256 + i] = (((j / 4 & 15) == 0) || (((i / 4 & 15) == 0) && ((((i / 4 & 31) == 0) ^ ((j / 4 >> 4) & 1)) == 0)))
+						? 0xff3c3c3c : 0xffb4b4b4;// wall
+					if (k == 2) tex_pixels[j * 256 + i] = (i / 4 == 0 || j / 4 == 0) ? 0xff505050 : 0xffb4b4b4;// ceiling
+					if (k == 3) tex_pixels[j * 256 + i] = 0xffffffff;// blank
+					if (k == 4) tex_pixels[j * 256 + i] = 0xffff00ff;// blank 2
+				}
+			}
+			grid_texture.push_back(new TextureBuffer(nullptr, false, false, Sizei(256, 256), 4, (unsigned char *)tex_pixels, 1));
+		}
+
+	}
 
     void Init(int includeIntensiveGPUobject)
     {
-        // Make textures
-		TextureBuffer* grid_texture[5];
-        for (int k = 0; k < 5; ++k)
-        {
-            static DWORD tex_pixels[256 * 256];
-            for (int j = 0; j < 256; ++j)
-            {
-                for (int i = 0; i < 256; ++i)
-                {
-                    if (k == 0) tex_pixels[j * 256 + i] = (((i >> 7) ^ (j >> 7)) & 1) ? 0xffb4b4b4 : 0xff505050;// floor
-                    if (k == 1) tex_pixels[j * 256 + i] = (((j / 4 & 15) == 0) || (((i / 4 & 15) == 0) && ((((i / 4 & 31) == 0) ^ ((j / 4 >> 4) & 1)) == 0)))
-                        ? 0xff3c3c3c : 0xffb4b4b4;// wall
-                    if (k == 2) tex_pixels[j * 256 + i] = (i / 4 == 0 || j / 4 == 0) ? 0xff505050 : 0xffb4b4b4;// ceiling
-                    if (k == 3) tex_pixels[j * 256 + i] = 0xffffffff;// blank
-					if (k == 4) tex_pixels[j * 256 + i] = 0xffff00ff;// blank 2
-                }
-            }
-			grid_texture[k] = new TextureBuffer(nullptr, false, false, Sizei(256, 256), 4, (unsigned char *)tex_pixels, 1);
-        }
-
         // Construct geometry
         Model * m = new Model(Vector3f(0, 0, 0), grid_texture[4]);  // Moving box
         m->AddSolidColorBox(-.75f, -0.25f, -.75f, .75f, 0.25f, .75f, 0xff404040);
@@ -749,16 +756,20 @@ struct Scene
         Add(m);
     }
 
-    Scene() : numModels(0) {}
-    Scene(bool includeIntensiveGPUobject) :
-        numModels(0)
+    Scene() {}
+    Scene(bool initialise)
     {
-        Init(includeIntensiveGPUobject);
+		MakeTextures();
+		if (initialise) {
+			Init(false);
+		}
     }
     void Release()
     {
-        while (numModels-- > 0)
-            delete Models[numModels];
+		for (size_t i = 0; i < models.size(); i++)
+		{
+			delete models[i];
+		}
     }
     ~Scene()
     {

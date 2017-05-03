@@ -19,7 +19,7 @@ PLEXUS_VIRTUAL_DEVICE_USE_CULL_FACE("true")
 */
 
 
-uniform mat4 matWVP;
+uniform mat4 matWV;
 
 // match oculus shaders
 in      vec4 Position;
@@ -31,7 +31,7 @@ out vec4 geometryColor;
 out vec2 geometryTexCoord;
 
 void main() {
-	geometryPosition = (matWVP * Position).xyz;
+	geometryPosition = (matWV * Position).xyz;
 	geometryColor = Color;
 	geometryTexCoord = TexCoord;
 }

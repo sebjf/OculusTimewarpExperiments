@@ -7,61 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <exception>
-
 #include "OpenGL_3_2_Utils\TextureLoader.h"
-
-#define ERRORMSG(msg) MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK);
-
-std::string readFile(const char *filePath) {
-	std::string content;
-	std::ifstream fileStream(filePath, std::ios::in);
-
-	if (!fileStream.is_open()) {
-		int currentdirlength = GetCurrentDirectory(0, NULL);
-		TCHAR* currentdir = new TCHAR[currentdirlength];
-		GetCurrentDirectory(currentdirlength, currentdir);
-		auto errorstring = std::string("Could not read file ") + std::string(currentdir) + std::string(filePath) + std::string(". File does not exist.");
-		delete currentdir;
-		ERRORMSG(errorstring.c_str());
-		return "";
-	}
-
-	std::string line = "";
-	while (!fileStream.eof()) {
-		std::getline(fileStream, line);
-		content.append(line + "\n");
-	}
-
-	fileStream.close();
-	return content;
-}
-
-GLuint LoadShader(GLenum type, const char* filename)
-{
-	GLuint shader;
-
-	GLint result = GL_FALSE;
-	int logLength = 0;
-
-	// load the shaders
-	shader = glCreateShader(type);
-	std::string shaderSrcStr = readFile(filename);
-	const char* shaderSrcStrPtr = shaderSrcStr.c_str();
-	glShaderSource(shader, 1, &shaderSrcStrPtr, NULL);
-	glCompileShader(shader);
-
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
-	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
-	char* shaderErrorMessagePtr = new char[logLength];
-	glGetShaderInfoLog(shader, logLength, NULL, shaderErrorMessagePtr);
-
-	if (result != GL_TRUE)
-	{
-		throw new std::exception(shaderErrorMessagePtr);
-	}
-
-	return shader;
-}
 
 RollingShutterRasteriser::RollingShutterRasteriser(ovrSizei fb)
 {
@@ -69,19 +15,7 @@ RollingShutterRasteriser::RollingShutterRasteriser(ovrSizei fb)
 	geometryShader = LoadShader(GL_GEOMETRY_SHADER, "./GLSL/RollingShutterRasterizationTexture2DGeometry.glsl");
 	fragmentShader = LoadShader(GL_FRAGMENT_SHADER, "./GLSL/RollingShutterRasterizationTexture2DFragment.glsl");
 	
-	program = glCreateProgram();
-	glAttachShader(program, vertexShader);
-	glAttachShader(program, geometryShader);
-	glAttachShader(program, fragmentShader);
-	glLinkProgram(program);
-
-	GLint linked;
-	glGetProgramiv(program, GL_LINK_STATUS, &linked);
-
-	if (!linked)
-	{
-		throw new std::exception("failed to link rolling rasterisation program");
-	}
+	Link();
 
 	useConvexHull = false;
 	primitiveFilterIndex = -1;
@@ -91,9 +25,13 @@ RollingShutterRasteriser::RollingShutterRasteriser(ovrSizei fb)
 	useRaytracing = true;
 }
 
-void RollingShutterRasteriser::Begin()
+void RollingShutterRasteriser::Render(Scene* scene, ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection)
 {
-	glUseProgram(program);
+	this->view0Matrix4 = view0;
+	this->view1Matrix4 = view1;
+	this->projectionMatrix4 = projection;
+
+	glUseProgram(getProgram());
 
 	/*
 	ovrMatrix4f view0Matrix4;
@@ -114,32 +52,17 @@ void RollingShutterRasteriser::Begin()
 	glUniform2i(glGetUniformLocation(getProgram(), "resolution"), m_resolution.x, m_resolution.y);
 	glUniform1i(glGetUniformLocation(getProgram(), "useRaytracing"), useRaytracing ? 1 : 0);
 
-}
-
-void RollingShutterRasteriser::End()
-{
-	glUseProgram(0);
-}
-
-void RollingShutterRasteriser::Render(Scene* scene, ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection)
-{
-	this->view0Matrix4 = view0;
-	this->view1Matrix4 = view1;
-	this->projectionMatrix4 = projection;
-
-	Begin();
-
-	for (int i = 0; i < scene->numModels; ++i) {
-		Render(scene->Models[i], view0, view1, projection);
+	for (size_t i = 0; i < scene->models.size(); ++i) {
+		Render(scene->models[i], view0, view1, projection);
 	}
 
-	End();
+	glUseProgram(0);
 }
 
 void RollingShutterRasteriser::Render(Model* model, ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection)
 {
 	Matrix4f matM = model->GetMatrix();
-	glUniformMatrix4fv(glGetUniformLocation(getProgram(), "matWVP"), 1, GL_TRUE, (FLOAT*)&matM);
+	glUniformMatrix4fv(glGetUniformLocation(getProgram(), "matWV"), 1, GL_TRUE, (FLOAT*)&matM);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vertexBuffer->buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->indexBuffer->buffer);
@@ -150,18 +73,18 @@ void RollingShutterRasteriser::Render(Model* model, ovrMatrix4f view0, ovrMatrix
 
 	glUniform1i(glGetUniformLocation(getProgram(), "Texture0"), 0);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, model->getTextureId());
+	glBindTexture(GL_TEXTURE_2D, GetTexture(model->getTextureId()));
 
 	glEnableVertexAttribArray(posLoc);
 	glEnableVertexAttribArray(colorLoc);
 	glEnableVertexAttribArray(uvLoc);
 
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, Pos));
+	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, Position));
 	glVertexAttribPointer(colorLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, C));
 	glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, U));
 
 	glDisable(GL_CULL_FACE);
-	glDrawElements(GL_TRIANGLES, model->numIndices, GL_UNSIGNED_SHORT, NULL);
+	glDrawElements(GL_TRIANGLES, model->Indices.size(), GL_UNSIGNED_SHORT, NULL);
 
 	glDisableVertexAttribArray(posLoc);
 	glDisableVertexAttribArray(colorLoc);

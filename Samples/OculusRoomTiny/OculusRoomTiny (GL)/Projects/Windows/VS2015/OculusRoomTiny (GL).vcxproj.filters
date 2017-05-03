@@ -17,6 +17,12 @@
     <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp">
       <Filter>Resources</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Log.cpp">
+      <Filter>Experiment</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Rasteriser.cpp">
+      <Filter>Rasterisation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
@@ -45,8 +51,11 @@
     <ClInclude Include="..\..\..\Log.h">
       <Filter>Experiment</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Experiment.h">
-      <Filter>Experiment</Filter>
+    <ClInclude Include="..\..\..\MyUtils.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Rasteriser.h">
+      <Filter>Rasterisation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -74,6 +83,12 @@
       <Filter>Rasterisation\GLSL</Filter>
     </None>
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DVertex.glsl">
+      <Filter>Rasterisation\GLSL</Filter>
+    </None>
+    <None Include="..\..\..\GLSL\TraditionalRasterizationFragment.glsl">
+      <Filter>Rasterisation\GLSL</Filter>
+    </None>
+    <None Include="..\..\..\GLSL\TraditionalRasterizationVertex.glsl">
       <Filter>Rasterisation\GLSL</Filter>
     </None>
   </ItemGroup>

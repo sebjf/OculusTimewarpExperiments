@@ -20,8 +20,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.cpp" />
+    <ClCompile Include="..\..\..\Log.cpp" />
     <ClCompile Include="..\..\..\main.cpp" />
     <ClCompile Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.cpp" />
+    <ClCompile Include="..\..\..\Rasteriser.cpp" />
     <ClCompile Include="..\..\..\RollingShutterRasteriser.cpp" />
     <ClCompile Include="..\..\..\Stimulus.cpp" />
     <ClCompile Include="..\..\..\TraditionalRasteriser.cpp" />
@@ -30,10 +32,11 @@
     <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.h" />
     <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE_GL.h" />
     <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
-    <ClInclude Include="..\..\..\Experiment.h" />
     <ClInclude Include="..\..\..\Log.h" />
+    <ClInclude Include="..\..\..\MyUtils.h" />
     <ClInclude Include="..\..\..\OpenGL_3_2_Utils\TextureLoader.h" />
     <ClInclude Include="..\..\..\RasterisationUtils.h" />
+    <ClInclude Include="..\..\..\Rasteriser.h" />
     <ClInclude Include="..\..\..\renderdoc_app.h" />
     <ClInclude Include="..\..\..\RollingShutterRasteriser.h" />
     <ClInclude Include="..\..\..\Stimulus.h" />
@@ -43,6 +46,8 @@
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DFragment.glsl" />
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DGeometry.glsl" />
     <None Include="..\..\..\GLSL\RollingShutterRasterizationTexture2DVertex.glsl" />
+    <None Include="..\..\..\GLSL\TraditionalRasterizationFragment.glsl" />
+    <None Include="..\..\..\GLSL\TraditionalRasterizationVertex.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{396D645E-3224-433C-AFBA-6EF6919A2214}</ProjectGuid>

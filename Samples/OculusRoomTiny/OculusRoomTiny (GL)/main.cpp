@@ -32,49 +32,35 @@ limitations under the License.
 #include "renderdoc_app.h"
 #include "Stimulus.h"
 #include "RasterisationUtils.h"
+#include "Log.h"
+#include "MyUtils.h"
 
-/* assimp include files. These three are usually needed. */
-#include <assimp/cimport.h>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+
+#include <ctime>
 
 using namespace OVR;
 
+/* 
+Add explicit support for debugging with renderdoc, since the oculus 
+requires a non-traditional render path that renderdoc has trouble 
+delinating 
+*/
 bool hasRenderdoc = false;
 long long frameIndex;
 RENDERDOC_API_1_1_1* pRenderDocAPI;
 
-const aiScene* assimpscene = NULL;
-
-Model* ImportAssimpModel(const aiScene* scene, int meshid = 0)
+/* 
+Use an enum to control flow of rendering condition and decouple flags used
+for input, to reduce likelihood of errors.
+*/
+enum RenderingCondition : int
 {
-	Model* model = new Model(Vector3f(0, 0, 0), NULL);
+	RenderingCondition_STD = 0,
+	RenderingCondition_ATW = 1,
+	RenderingCondition_ROL = 2
+};
 
-	auto mesh = scene->mMeshes[meshid];
-
-	for (size_t i = 0; i < mesh->mNumFaces; i++)
-	{
-		auto face = mesh->mFaces[i];
-		assert(face.mNumIndices == 3);
-		model->AddIndex(face.mIndices[0]);
-		model->AddIndex(face.mIndices[1]);
-		model->AddIndex(face.mIndices[2]);
-	}
-
-	for (size_t i = 0; i < mesh->mNumVertices; i++)
-	{
-		Model::Vertex v;
-		v.Pos = Vector3f(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
-		v.C = 0xFFFFFFFF;
-		v.U = mesh->mTextureCoords[0][i].x;
-		v.V = mesh->mTextureCoords[0][i].y;
-		model->AddVertex(v);
-	}
-
-	model->AllocateBuffers();
-
-	return model;
-}
+RenderingCondition renderingCondition;
 
 /* Describes the predicted motion throughout an upcoming frame */
 struct Prediction
@@ -119,9 +105,8 @@ Prediction GetPrediction(ovrSession session, ovrVector3f* HmdToEyeOffset, double
 // return true to retry later (e.g. after display lost)
 static bool MainLoop(bool retryCreate)
 {
-	// sort out renderdoc. need to start from within renderdoc to find module this way. otherwise need to
-	// load it explicitly.
-
+	// sort out renderdoc. need to start from within renderdoc to find module this way. otherwise it must
+	// be loaded explicitly.
 	HMODULE hRenderDoc = GetModuleHandle("renderdoc");
 	if (hRenderDoc != NULL)
 	{
@@ -130,10 +115,16 @@ static bool MainLoop(bool retryCreate)
 		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_1, (void**)&pRenderDocAPI);
 	}
 
+	// Import the assets that are not hardcoded into the example
+
 	auto stream = aiGetPredefinedLogStream(aiDefaultLogStream_STDOUT, NULL);
 	aiAttachLogStream(&stream);
+	const aiScene* assimpscene = aiImportFile("./Assets/box.obj", aiProcessPreset_TargetRealtime_MaxQuality);
+	const aiScene* sponza = aiImportFile("./Assets/sponza.obj", aiProcessPreset_TargetRealtime_MaxQuality);
 
-	assimpscene = aiImportFile("./Assets/box.obj", aiProcessPreset_TargetRealtime_MaxQuality);
+	// create the log, this will output directly to the file. the file will be closed when this is 
+	// destroyed automatically when the program ends
+	Logger log;
 
 	Prediction prediction0;
 	Prediction prediction1;
@@ -151,6 +142,12 @@ static bool MainLoop(bool retryCreate)
 	bool enableRollingShutter = false;
 	bool enableClearScreen = false;
 
+	TriggerInput inputAdvanceSymbol;
+	TriggerInput inputRenderDocCaptureFrame;
+	TriggerInputs userInput;
+
+	TriggerInput  inputs[10];
+
     ovrSession session;
 	ovrGraphicsLuid luid;
     ovrResult result = ovr_Create(&session, &luid);
@@ -163,8 +160,11 @@ static bool MainLoop(bool retryCreate)
     // Note: the mirror window can be any size, for this sample we use 1/2 the HMD resolution
 
     ovrSizei windowSize = { hmdDesc.Resolution.w / 2, hmdDesc.Resolution.h / 2 };
-    if (!Platform.InitDevice(windowSize.w, windowSize.h, reinterpret_cast<LUID*>(&luid)))
-        goto Done;
+	if (!Platform.InitDevice(windowSize.w, windowSize.h, reinterpret_cast<LUID*>(&luid)))
+	{
+		VALIDATE(false, "Failed to init device.");
+		exit(1);
+	}
 
 	ovrSizei idealTextureSize;
 
@@ -177,8 +177,8 @@ static bool MainLoop(bool retryCreate)
 
         if (!eyeRenderTexture[eye]->TextureChain)
         {
-            if (retryCreate) goto Done;
             VALIDATE(false, "Failed to create texture.");
+			exit(1);
         }
     }
 	
@@ -192,8 +192,8 @@ static bool MainLoop(bool retryCreate)
     result = ovr_CreateMirrorTextureGL(session, &desc, &mirrorTexture);
     if (!OVR_SUCCESS(result))
     {
-        if (retryCreate) goto Done;
         VALIDATE(false, "Failed to create mirror texture.");
+		exit(1);
     }
 
     // Configure the mirror read buffer
@@ -210,52 +210,97 @@ static bool MainLoop(bool retryCreate)
     wglSwapIntervalEXT(0);
 	
     // Make scene - can simplify further if needed
+	// MUST BE CALLED AFTER OPENGL INITIALISATON
     roomScene = new Scene(false);
+	auto sponza_models = ImportAssimpScene(sponza);
+	for (size_t i = 0; i < sponza_models.size(); i++)
+	{
+		sponza_models[i]->Scale = 0.07f;
+		roomScene->models.push_back(sponza_models[i]);
+	}
 
 	// replace the default box with our own
-	roomScene->Models[0] = ImportAssimpModel(assimpscene, 0);
+	roomScene->models[0] = ImportAssimpModel(assimpscene, 0);
 
 	RollingShutterRasteriser* rollingShutterRasteriser = new RollingShutterRasteriser(idealTextureSize);
 	TraditionalRasteriser* traditionalRasteriser = new TraditionalRasteriser();
 	Stimulus* stimuli = new Stimulus();
+	BlockedConditions* conditions = new BlockedConditions(60, 5, stimuli);
 
-	stimuli->m_model = roomScene->Models[0];
+	stimuli->m_model = roomScene->models[0];
 
     // FloorLevel will give tracking poses where the floor height is 0
     ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
 
-	bool enableRenderDocCapture = false;
-	bool enableTextureAdvance = false;
+	renderingCondition = RenderingCondition_STD;
 
-	int character = 0;
+	//renderingCondition = (RenderingCondition)conditions->GetNext().rasterisation;
 
     // Main loop
     while (Platform.HandleMessages())
     {
         // Keyboard inputs to adjust player orientation
-        static float Yaw(3.141592f);  
-        if (Platform.Key[VK_LEFT])  Yaw += 0.02f;
-        if (Platform.Key[VK_RIGHT]) Yaw -= 0.02f;
+        static float Yaw(3.141592f);
 
         // Keyboard inputs to adjust player position
-        static Vector3f Pos2(0.0f,0.0f,-5.0f);
-        if (Platform.Key['W']||Platform.Key[VK_UP])     Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(0,0,-0.05f));
-        if (Platform.Key['S']||Platform.Key[VK_DOWN])   Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(0,0,+0.05f));
-        if (Platform.Key['D'])                          Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(+0.05f,0,0));
-        if (Platform.Key['A'])                          Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(-0.05f,0,0));
+        static Vector3f Pos2(0.0f,1.5f,-0.0f);
+        if (Platform.Key['W'])		Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(0,0,-0.05f));
+        if (Platform.Key['S'])		Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(0,0,+0.05f));
+        if (Platform.Key['D'])      Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(+0.05f,0,0));
+        if (Platform.Key['A'])      Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(-0.05f,0,0));
 
-		if (Platform.Key['1'])                          enableAsyncTimewarp = true; else enableAsyncTimewarp = false;
-		if (Platform.Key['2'])                          enableRenderPose = true; else enableRenderPose = false;
-		if (Platform.Key['3'])                          enableRollingShutter = true; else enableRollingShutter = false;
-		if (Platform.Key['4'])                          enableClearScreen = true; else enableClearScreen = false;
-		if (Platform.Key['P'])							enableRenderDocCapture = true;
-		if (Platform.Key['5'])                          enableTextureAdvance = true; else enableTextureAdvance = false;
+		if (Platform.Key['1'])      enableAsyncTimewarp = true;		else enableAsyncTimewarp = false;
+		if (Platform.Key['2'])      enableRenderPose = true;		else enableRenderPose = false;
+		if (Platform.Key['3'])      enableRollingShutter = true;	else enableRollingShutter = false;
+		if (Platform.Key['4'])      enableClearScreen = true;		else enableClearScreen = false;
 
-		if (enableTextureAdvance)
-		{
-			stimuli->m_model->textureId = stimuli->GetCharacterTexture(character++);
+		if (inputs[0].Update(Platform.Key[VK_NUMPAD8]).IsTriggered()) stimuli->speed2 += 0.01f;
+		if (inputs[1].Update(Platform.Key[VK_NUMPAD2]).IsTriggered()) stimuli->speed2 -= 0.01f;
+		if (inputs[2].Update(Platform.Key[VK_NUMPAD6]).IsTriggered()) stimuli->speed1 += 0.01f;
+		if (inputs[3].Update(Platform.Key[VK_NUMPAD4]).IsTriggered()) stimuli->speed1 -= 0.01f;
+
+		inputAdvanceSymbol.Update(Platform.Key['5']);
+		inputRenderDocCaptureFrame.Update(Platform.Key['P']);
+
+		// Process the user input
+
+		userInput.Update(Platform.Key[VK_LEFT], Platform.Key[VK_RIGHT], Platform.Key[VK_DOWN], false);
+
+		if (userInput.IsTriggered()) {
+			// This is the logic for the experimental protocol - nice and simple!
+
+			log.Step(((float)clock()) / CLOCKS_PER_SEC, userInput.Trigger(), (int)renderingCondition, stimuli);
+
+			if (conditions->IsDone())
+			{
+				Platform.Running = false;
+				goto Done;
+			}
+
+			auto c = conditions->GetNext();
+			renderingCondition = (RenderingCondition)c.rasterisation;
+			stimuli->SetCurrentCharacterId(c.character);
 		}
 
+		// Allow overriding of the condition
+
+		if (enableAsyncTimewarp)
+		{
+			renderingCondition = RenderingCondition_ATW;
+		}
+		if (enableRollingShutter)
+		{
+			renderingCondition = RenderingCondition_ROL;
+		}
+
+		// Allow overriding of symbol
+
+		if (inputAdvanceSymbol.IsTriggered())
+		{
+			stimuli->SetCurrentCharacterId(stimuli->GetCurrentCharacterId() + 1);
+		}
+
+		stimuli->m_model->textureId = stimuli->GetCharacterTexture(stimuli->GetCurrentCharacterId());
 
 	    // Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
 	    ovrEyeRenderDesc eyeRenderDesc[2];
@@ -266,10 +311,11 @@ static bool MainLoop(bool retryCreate)
         ovrVector3f               HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
                                                         eyeRenderDesc[1].HmdToEyeOffset };
 
+		// Update the stimuli (this updates the position only, texture is handled above)
 
 		stimuli->Update();
 
-        double sensorSampleTime = 0;    // sensorSampleTime is fed into the layer later
+		stimuli->speed2 = 0;
 
 		if (!enableRenderPose) {
 			//	ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime)
@@ -279,7 +325,7 @@ static bool MainLoop(bool retryCreate)
 			prediction1.worldOffset = Pos2;
 		}
 
-		if (enableRenderDocCapture && hasRenderdoc)
+		if (inputRenderDocCaptureFrame.IsTriggered() && hasRenderdoc)
 		{
 			pRenderDocAPI->StartFrameCapture(NULL, NULL);
 		}
@@ -291,13 +337,15 @@ static bool MainLoop(bool retryCreate)
 				// Switch to eye render target
 				eyeRenderTexture[eye]->SetAndClearRenderSurface(eyeDepthBuffer[eye]);
 
-				Matrix4f proj = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.2f, 1000.0f, ovrProjection_None);
+				Matrix4f proj = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.2f, 10000.0f, ovrProjection_None);
 
-				if (!enableRollingShutter) {
-					// Render world (regular rasterisation)
+				if (renderingCondition == RenderingCondition_STD || renderingCondition == RenderingCondition_ATW) 
+				{
+					// Render world (regular rasterisation or atw)
 					traditionalRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
-				}
-				else {
+				}else
+				if(renderingCondition == RenderingCondition_ROL)
+				{
 					// Rolling Shutter Rasterisation
 					rollingShutterRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
 				}
@@ -318,10 +366,9 @@ static bool MainLoop(bool retryCreate)
             }
         }
 
-		if (enableRenderDocCapture && hasRenderdoc)
+		if (inputRenderDocCaptureFrame.IsTriggered() && hasRenderdoc)
 		{
 			pRenderDocAPI->EndFrameCapture(NULL, NULL);
-			enableRenderDocCapture = false;
 		}
 
         // Do distortion rendering, Present and flush/sync
@@ -330,18 +377,13 @@ static bool MainLoop(bool retryCreate)
         ld.Header.Type  = ovrLayerType_EyeFov;
 		ld.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;   // Because OpenGL.
 
-		if (!enableAsyncTimewarp)
-		{
-			ld.Header.Flags |= ovrLayerFlag_HeadLocked;
-		}
-
         for (int eye = 0; eye < 2; ++eye)
         {
             ld.ColorTexture[eye] = eyeRenderTexture[eye]->TextureChain;
             ld.Viewport[eye]     = Recti(eyeRenderTexture[eye]->GetSize());
             ld.Fov[eye]          = hmdDesc.DefaultEyeFov[eye];
 
-			if (enableAsyncTimewarp)
+			if (renderingCondition == RenderingCondition_ATW)
 			{
 				ld.RenderPose[eye] = prediction0.EyeRenderPose[eye];
 			}
@@ -350,6 +392,7 @@ static bool MainLoop(bool retryCreate)
 				ovrPosef identityPose = ovrPosef();
 				identityPose.Orientation.w = 1.0f;
 				ld.RenderPose[eye] = identityPose;
+				ld.Header.Flags |= ovrLayerFlag_HeadLocked;
 			}
 
             ld.SensorSampleTime  = prediction0.sensorSampleTime;
