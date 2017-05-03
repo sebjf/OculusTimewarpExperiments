@@ -35,10 +35,12 @@ layout(triangles) in;
 layout(triangle_strip, max_vertices = POINT_COUNT) out;
 
 in vec3 geometryPosition[];
+in vec3 geometryNormal[];
 in vec4 geometryColor[];
 in vec2 geometryTexCoord[];
 
 flat out vec3 triPositions[3];
+flat out vec3 triNormals[3];
 flat out vec4 triColors[3];
 flat out vec2 triTexCoords[3];
 
@@ -82,9 +84,7 @@ Ray getRollingRay(const in vec2 fragCoord, const in ivec2 resolution, const in f
 	return ray;
 }
 
-vec3 project(const vec4 v) {
-	return v.xyz / v.w;
-}
+
 
 // Tests, if the direciton from point to start is on th eleft side of the direction from oldPoint to start
 bool isLeftOf(const vec2 point, const vec2 oldPoint, const vec2 start) {
@@ -174,6 +174,10 @@ void emitQuadHull(const vec2 positions[POINT_COUNT]) {
 	emitPolygon(quadPositions, 4);
 }
 
+vec3 project(const vec4 v) {
+	return v.xyz / v.w;
+}
+
 void getPositionsSimple(out vec2 positions[POINT_COUNT]) {
 	mat4 m0 = projectionMatrix4 * view0Matrix4;
 	mat4 m1 = projectionMatrix4 * view1Matrix4;
@@ -213,8 +217,8 @@ bool cull() {
 	mat4 m1 = view1Matrix4;
 
 	for (int i = 0; i < 6; i++) {
-		if (project(m0 * vec4(geometryPosition[i], 1)).z > 0) return true;
-		if (project(m1 * vec4(geometryPosition[i], 1)).z > 0) return true;
+		if (project(m0 * vec4(geometryPosition[i], 1)).z > 0.0) return true;
+		if (project(m1 * vec4(geometryPosition[i], 1)).z > 0.0) return true;
 	}
 	return false;
 }
@@ -224,11 +228,14 @@ void main() {
 
 	if (primitiveFilterIndex > -1 && gl_PrimitiveIDIn != primitiveFilterIndex) return;
 
-	if (cull()) return;
+	//if (cull()) return;
 
 	triPositions[0] = geometryPosition[0];
 	triPositions[1] = geometryPosition[1];
 	triPositions[2] = geometryPosition[2];
+	triNormals[0] = geometryNormal[0];
+	triNormals[1] = geometryNormal[1];
+	triNormals[2] = geometryNormal[2];
 	triColors[0] = geometryColor[0];
 	triColors[1] = geometryColor[1];
 	triColors[2] = geometryColor[2];

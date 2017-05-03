@@ -33,18 +33,33 @@ public:
 	Logger();
 	~Logger();
 
-	void Step(float time, int answer, int renderingcondition, Stimulus* stimuli);
-
 	int GetNumEntries()
 	{
 		return numEntries;
 	}
 
-private:
+protected:
 	std::ofstream logfile;
 
 	void Step(LogEntry entry);
 
 	int numEntries;
+};
+
+class Logger2 : public Logger
+{
+public:
+	Logger2()
+	{
+		previousCharacterId = -1;
+	}
+	void Step(float time, int answer, int renderingcondition, Stimulus* stimuli);
+	int previousCharacterId;
+};
+
+class Logger3 : public Logger
+{
+public:
+	void Step(float time, float error, int condition);
 	int previousCharacterId;
 };

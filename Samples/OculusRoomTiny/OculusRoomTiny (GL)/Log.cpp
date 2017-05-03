@@ -23,7 +23,6 @@ Logger::Logger()
 
 	logfile = std::ofstream(filename, ofstream::out | ofstream::ate);
 
-	previousCharacterId = -1;
 	numEntries = 0;
 }
 
@@ -45,7 +44,7 @@ std::ostream& operator<<(std::ostream& os, const LogEntry& entry)
 	return os;
 }
 
-void Logger::Step(float time, int answer, int renderingcondition, Stimulus* stimuli)
+void Logger2::Step(float time, int answer, int renderingcondition, Stimulus* stimuli)
 {
 	int currentCharacterId = stimuli->GetCurrentCharacterId();
 	
@@ -66,12 +65,19 @@ void Logger::Step(float time, int answer, int renderingcondition, Stimulus* stim
 
 	previousCharacterId = currentCharacterId;
 
-	Step(entry);
+	logfile << entry << endl;
+
+	numEntries++;
 }
 
-void Logger::Step(LogEntry entry)
+void Logger3::Step(float time, float error, int condition)
 {
-	logfile << entry << endl;
+
+	logfile << time << ", ";
+	logfile << condition << ", ";
+	logfile << error << ", ";
+	logfile << endl;
+
 	numEntries++;
 }
 

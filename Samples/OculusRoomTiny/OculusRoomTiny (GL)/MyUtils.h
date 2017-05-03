@@ -129,6 +129,33 @@ private:
 
 };
 
+class TimeTrigger
+{
+public:
+	int last[10];
+
+	TimeTrigger()
+	{
+		for (size_t i = 0; i < 10; i++)
+		{
+			last[i] = 0;
+		}
+	}
+
+	bool IsTrigger(float time, int i)
+	{
+		int seconds = (int)time / i;
+		
+		if (last[i] != seconds)
+		{
+			last[i] = seconds;
+			return true;
+		}
+
+		return false;
+	}
+};
+
 class BlockedConditions
 {
 public:
@@ -156,50 +183,23 @@ public:
 
 		std::random_shuffle(conditions_compressed.begin(), conditions_compressed.end());
 
+
+		std::vector<int> matching;
+		for (size_t i = 0; i < stimulus->characters.size(); i++)
+		{
+			if (stimulus->GetCharacterCode(i) > 7)
+			{
+				matching.push_back(i);
+			}
+		}
+
 		for (size_t i = 0; i < conditions_compressed.size(); i++)
 		{
 			for (size_t j = 0; j < blocksize; j++)
 			{
 				Condition condition;
 				condition.rasterisation = conditions_compressed[i];
-				condition.character = rand() % stimulus->GetCharacterCount();
-
-				if (i > 0)
-				{
-					if (rand() % 2 == 0)	
-					{
-						// dont change character, just size
-
-						do {
-
-							// get all characters with matching codes
-							std::vector<int> matching;
-							for (size_t i = 0; i < stimulus->characters.size(); i++)
-							{
-								if (stimulus->GetCharacterCode(i) == stimulus->GetCharacterCode((conditions.end()-1)->character))
-								{
-									matching.push_back(i);
-								}
-							}
-
-							if (matching.size() < 2)
-							{
-								break; //just pick another character
-							}
-
-							condition.character = matching[rand() % matching.size()];
-						} while (condition.character == (conditions.end()-1)->character);
-					}
-					else
-					{
-						// change the character, code and/or size
-						while (condition.character == (conditions.end()-1)->character)
-						{
-							condition.character = rand() % stimulus->GetCharacterCount();
-						}
-					}
-				}
-
+				condition.character = matching[rand() % matching.size()];
 				conditions.push_back(condition);
 			}
 		}

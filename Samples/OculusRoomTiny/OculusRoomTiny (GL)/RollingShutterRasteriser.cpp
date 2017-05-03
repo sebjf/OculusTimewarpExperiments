@@ -61,30 +61,37 @@ void RollingShutterRasteriser::Render(Scene* scene, ovrMatrix4f view0, ovrMatrix
 
 void RollingShutterRasteriser::Render(Model* model, ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection)
 {
-	Matrix4f matM = model->GetMatrix();
-	glUniformMatrix4fv(glGetUniformLocation(getProgram(), "matWV"), 1, GL_TRUE, (FLOAT*)&matM);
+	Matrix4f matW = model->GetMatrix();
+	glUniformMatrix4fv(glGetUniformLocation(getProgram(), "matW"), 1, GL_TRUE, (FLOAT*)&matW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vertexBuffer->buffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->indexBuffer->buffer);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, GetTexture(model->getTextureId()));
 
 	GLuint posLoc = glGetAttribLocation(getProgram(), "Position");
 	GLuint colorLoc = glGetAttribLocation(getProgram(), "Color");
 	GLuint uvLoc = glGetAttribLocation(getProgram(), "TexCoord");
 
-	glUniform1i(glGetUniformLocation(getProgram(), "Texture0"), 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, GetTexture(model->getTextureId()));
+	GLuint lPosition = glGetAttribLocation(program, "Position");
+	GLuint lNormal = glGetAttribLocation(program, "Normal");
+	GLuint lColour = glGetAttribLocation(program, "Color");
+	GLuint lUVs = glGetAttribLocation(program, "TexCoord");
 
-	glEnableVertexAttribArray(posLoc);
-	glEnableVertexAttribArray(colorLoc);
-	glEnableVertexAttribArray(uvLoc);
+	glEnableVertexAttribArray(lPosition);
+	glEnableVertexAttribArray(lColour);
+	glEnableVertexAttribArray(lUVs);
+	glEnableVertexAttribArray(lNormal);
 
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, Position));
-	glVertexAttribPointer(colorLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, C));
-	glVertexAttribPointer(uvLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, U));
+	glVertexAttribPointer(lPosition, 3, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, Position));
+	glVertexAttribPointer(lNormal, 3, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, Normal));
+	glVertexAttribPointer(lColour, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, C));
+	glVertexAttribPointer(lUVs, 2, GL_FLOAT, GL_FALSE, sizeof(Model::Vertex), (void*)OVR_OFFSETOF(Model::Vertex, U));
 
 	glDisable(GL_CULL_FACE);
 	glDrawElements(GL_TRIANGLES, model->Indices.size(), GL_UNSIGNED_SHORT, NULL);
+	glEnable(GL_CULL_FACE);
 
 	glDisableVertexAttribArray(posLoc);
 	glDisableVertexAttribArray(colorLoc);

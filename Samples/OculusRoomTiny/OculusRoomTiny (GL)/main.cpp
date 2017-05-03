@@ -120,11 +120,11 @@ static bool MainLoop(bool retryCreate)
 	auto stream = aiGetPredefinedLogStream(aiDefaultLogStream_STDOUT, NULL);
 	aiAttachLogStream(&stream);
 	const aiScene* assimpscene = aiImportFile("./Assets/box.obj", aiProcessPreset_TargetRealtime_MaxQuality);
-	const aiScene* sponza = aiImportFile("./Assets/sponza.obj", aiProcessPreset_TargetRealtime_MaxQuality);
+	const aiScene* sponza = aiImportFile("./Assets/sponza_simplified.obj", aiProcessPreset_TargetRealtime_MaxQuality);
 
 	// create the log, this will output directly to the file. the file will be closed when this is 
 	// destroyed automatically when the program ends
-	Logger log;
+	Logger3 log;
 
 	Prediction prediction0;
 	Prediction prediction1;
@@ -212,6 +212,7 @@ static bool MainLoop(bool retryCreate)
     // Make scene - can simplify further if needed
 	// MUST BE CALLED AFTER OPENGL INITIALISATON
     roomScene = new Scene(false);
+	roomScene->models.push_back(NULL); // for the box
 	auto sponza_models = ImportAssimpScene(sponza);
 	for (size_t i = 0; i < sponza_models.size(); i++)
 	{
@@ -225,16 +226,18 @@ static bool MainLoop(bool retryCreate)
 	RollingShutterRasteriser* rollingShutterRasteriser = new RollingShutterRasteriser(idealTextureSize);
 	TraditionalRasteriser* traditionalRasteriser = new TraditionalRasteriser();
 	Stimulus* stimuli = new Stimulus();
-	BlockedConditions* conditions = new BlockedConditions(60, 5, stimuli);
+	BlockedConditions* conditions = new BlockedConditions(30, 5, stimuli);
 
 	stimuli->m_model = roomScene->models[0];
 
     // FloorLevel will give tracking poses where the floor height is 0
     ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
 
-	renderingCondition = RenderingCondition_STD;
+	renderingCondition = RenderingCondition_ROL;
 
 	//renderingCondition = (RenderingCondition)conditions->GetNext().rasterisation;
+
+	TimeTrigger timeTrigger;
 
     // Main loop
     while (Platform.HandleMessages())
@@ -262,14 +265,35 @@ static bool MainLoop(bool retryCreate)
 		inputAdvanceSymbol.Update(Platform.Key['5']);
 		inputRenderDocCaptureFrame.Update(Platform.Key['P']);
 
+		// Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
+		ovrEyeRenderDesc eyeRenderDesc[2];
+		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
+		eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmdDesc.DefaultEyeFov[1]);
+
+		// Get eye poses, feeding in correct IPD offset
+		ovrVector3f               HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
+														eyeRenderDesc[1].HmdToEyeOffset };
+
+		if (!enableRenderPose) {
+			//	ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime)
+			prediction0 = GetPrediction(session, HmdToEyeOffset, 0);
+			prediction0.worldOffset = Pos2;
+			prediction1 = GetPrediction(session, HmdToEyeOffset, 0.0133);
+			prediction1.worldOffset = Pos2;
+		}
+
 		// Process the user input
 
-		userInput.Update(Platform.Key[VK_LEFT], Platform.Key[VK_RIGHT], Platform.Key[VK_DOWN], false);
+		userInput.Update(Platform.Key[VK_LEFT], Platform.Key[VK_RIGHT], Platform.Key[VK_UP], Platform.Key[VK_DOWN]);
 
+		// -------------------------------------------------------------
+
+		/*
 		if (userInput.IsTriggered()) {
 			// This is the logic for the experimental protocol - nice and simple!
 
 			log.Step(((float)clock()) / CLOCKS_PER_SEC, userInput.Trigger(), (int)renderingCondition, stimuli);
+
 
 			if (conditions->IsDone())
 			{
@@ -281,6 +305,45 @@ static bool MainLoop(bool retryCreate)
 			renderingCondition = (RenderingCondition)c.rasterisation;
 			stimuli->SetCurrentCharacterId(c.character);
 		}
+		*/
+
+		// -------------------------------------------------------------
+
+		// -------------------------------------------------------------
+
+		/*
+		float timeoffset = ((float)clock()) / CLOCKS_PER_SEC;
+
+		if (timeTrigger.IsTrigger(timeoffset, 6))
+		{
+			if (conditions->IsDone())
+			{
+				Platform.Running = false;
+				goto Done;
+			}
+
+			auto c = conditions->GetNext();
+			renderingCondition = (RenderingCondition)c.rasterisation;
+		}
+
+		if (timeTrigger.IsTrigger(timeoffset, 1))
+		{
+			stimuli->multiplier = 1.0f + (((float)(rand() % 100) / 100.0f) * 0.9f);
+		}		
+
+		if (isVisible)
+		{
+			Quatf orientation = Quatf(prediction0.EyeRenderPose->Orientation);
+			Vector3f lookat = orientation.Rotate(Vector3f(0, 0, 1));
+			float accuracy = lookat.Normalized().Dot(stimuli->m_model->Pos.Normalized());
+			log.Step(timeoffset, accuracy, (int)renderingCondition);
+		}
+		*/
+		
+
+		// -------------------------------------------------------------
+
+
 
 		// Allow overriding of the condition
 
@@ -302,28 +365,11 @@ static bool MainLoop(bool retryCreate)
 
 		stimuli->m_model->textureId = stimuli->GetCharacterTexture(stimuli->GetCurrentCharacterId());
 
-	    // Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
-	    ovrEyeRenderDesc eyeRenderDesc[2];
-	    eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
-	    eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmdDesc.DefaultEyeFov[1]);
-
-        // Get eye poses, feeding in correct IPD offset
-        ovrVector3f               HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
-                                                        eyeRenderDesc[1].HmdToEyeOffset };
-
 		// Update the stimuli (this updates the position only, texture is handled above)
 
 		stimuli->Update();
 
 		stimuli->speed2 = 0;
-
-		if (!enableRenderPose) {
-			//	ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime)
-			prediction0 = GetPrediction(session, HmdToEyeOffset, -0.005);
-			prediction0.worldOffset = Pos2;	
-			prediction1 = GetPrediction(session, HmdToEyeOffset, 0.005);
-			prediction1.worldOffset = Pos2;
-		}
 
 		if (inputRenderDocCaptureFrame.IsTriggered() && hasRenderdoc)
 		{
@@ -342,12 +388,12 @@ static bool MainLoop(bool retryCreate)
 				if (renderingCondition == RenderingCondition_STD || renderingCondition == RenderingCondition_ATW) 
 				{
 					// Render world (regular rasterisation or atw)
-					traditionalRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
+					traditionalRasteriser->Render	(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
 				}else
 				if(renderingCondition == RenderingCondition_ROL)
 				{
 					// Rolling Shutter Rasterisation
-					rollingShutterRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
+					rollingShutterRasteriser->Render(roomScene, prediction0.GetView(eye), prediction0.GetView(eye), proj);
 				}
 
 				if (enableClearScreen) {

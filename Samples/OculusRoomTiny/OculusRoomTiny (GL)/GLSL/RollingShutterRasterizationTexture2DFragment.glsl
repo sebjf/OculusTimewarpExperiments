@@ -53,6 +53,7 @@ struct Ray {
 };
 
 flat in vec3 triPositions[3];
+flat in vec3 triNormals[3];
 flat in vec4 triColors[3];
 flat in vec2 triTexCoords[3];
 
@@ -66,11 +67,6 @@ PLEXUS_SLOT_UNIFORM(ivec2, resolution)
 PLEXUS_SLOT_UNIFORM(bool, useRaytracing)
 
 layout(location = 0) out vec4 FragColor; //http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
-
-PLEXUS_FRAMEBUFFER_ATTACHMENT(vec4, position, GL_RGBA32F)
-PLEXUS_FRAMEBUFFER_ATTACHMENT(vec3, normal, GL_RGB16F)
-PLEXUS_FRAMEBUFFER_ATTACHMENT(float, depth, GL_DEPTH_COMPONENT32)
-
 
 mat4 mix(mat4 m0, mat4 m1, const float t) {
 	return m0 + t * (m1 - m0);
@@ -132,29 +128,29 @@ void main() {
 
 	Ray ray = getRollingRay(gl_FragCoord.xy, resolution, 0, roll);
 
-	float tBest = 1000000;
+	float tBest = 100000;
 	vec2 coordBest = vec2(0);
 	bool hit = intersectTri(
 		triPositions[0], triPositions[1], triPositions[2], ray, tBest, coordBest);
-	hit = hit || intersectTri(
-		triPositions[2], triPositions[0], triPositions[1], ray, tBest, coordBest);
+//	hit = hit || intersectTri(
+//		triPositions[2], triPositions[0], triPositions[1], ray, tBest, coordBest);
 
 	if (useRaytracing) {
 		if (!hit) discard;
 
-		position.xzy = INTERPOLATE_BARYCENTRIC(triPositions[0], triPositions[1], triPositions[1], coordBest);
-		position.a = 1;
-
+		vec3 position   = INTERPOLATE_BARYCENTRIC(triPositions[0], triPositions[1], triPositions[2], coordBest);
 		vec4 color		= INTERPOLATE_BARYCENTRIC(triColors[0], triColors[1], triColors[2], coordBest);
+		vec3 normal		= INTERPOLATE_BARYCENTRIC(triNormals[0], triNormals[1], triNormals[2], coordBest);
 		vec2 texcoord	= INTERPOLATE_BARYCENTRIC(triTexCoords[0], triTexCoords[1], triTexCoords[2], coordBest);
 
-		gl_FragDepth = tBest / 100.0;
-		FragColor = color * texture2D(Texture0, texcoord).x;
+		gl_FragDepth = tBest / 100000.0;
+		//FragColor = color * texture2D(Texture0, texcoord).x;
+		//FragColor = color * max(0.1, dot(normalize(normal.xyz), -normalize(position.xyz)) ) * texture2D(Texture0, texcoord).x;
+		FragColor.xyz = normal.xyz;
+		FragColor.a = 1.0;  
 
 	} else {
 		gl_FragDepth = 0.5;
-		position = vec4(1);
-		normal = vec3(0);
 		FragColor = vec4(1,1,1,1);
 	}
 	
