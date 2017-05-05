@@ -19,7 +19,7 @@ Logger::Logger()
 	strftime(buffer, sizeof(buffer), "%d-%m-%Y_%I-%M-%S", &timeinfo);
 	string str(buffer);
 
-	string filename = "Logs/Log_v2_" + str + ".log";
+	string filename = "Logs/Log_" + GetHeader() + "_" + str + ".log";
 
 	logfile = std::ofstream(filename, ofstream::out | ofstream::ate);
 
@@ -70,12 +70,18 @@ void Logger2::Step(float time, int answer, int renderingcondition, Stimulus* sti
 	numEntries++;
 }
 
-void Logger3::Step(float time, float error, int condition)
+void Logger3::Step(float time, Vector3f head, Vector3f box, int condition, float speed)
 {
 
 	logfile << time << ", ";
 	logfile << condition << ", ";
-	logfile << error << ", ";
+	logfile << head.x << ", ";
+	logfile << head.y << ", ";
+	logfile << head.z << ", ";
+	logfile << box.x << ", ";
+	logfile << box.y << ", ";
+	logfile << box.z << ", ";
+	logfile << speed << ", ";
 	logfile << endl;
 
 	numEntries++;

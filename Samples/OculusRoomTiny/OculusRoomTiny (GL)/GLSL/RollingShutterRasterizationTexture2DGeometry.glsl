@@ -52,7 +52,10 @@ PLEXUS_SLOT_UNIFORM(bool, useConvexHull)
 PLEXUS_SLOT_UNIFORM(int,  primitiveFilterIndex)
 PLEXUS_SLOT_UNIFORM(bool, useAdaptiveBounds)
 
+uniform float rollOffset;
+
 mat4 mix(mat4 m0, mat4 m1, const float t) {
+	float t_eye = ((1-t) * 0.5) + rollOffset;
 	return m0 + t * (m1 - m0);
 }
 
@@ -158,8 +161,8 @@ void emitConvexHull(const vec2 positions[POINT_COUNT]) {
 }
 
 void emitQuadHull(const vec2 positions[POINT_COUNT]) {
-	vec2 minPosition = vec2(+10000);
-	vec2 maxPosition = vec2(-10000);
+	vec2 minPosition = vec2(+100000);
+	vec2 maxPosition = vec2(-100000);
 	for (int i = 0; i < POINT_COUNT; i++) {
 		minPosition = min(minPosition, positions[i]);
 		maxPosition = max(maxPosition, positions[i]);
@@ -171,11 +174,19 @@ void emitQuadHull(const vec2 positions[POINT_COUNT]) {
 	quadPositions[1] = vec2(maxPosition.x, maxPosition.y);
 	quadPositions[0] = vec2(minPosition.x, maxPosition.y);
 
+	// full screen quad
+	/*
+	quadPositions[3] = vec2(-1, -1);
+	quadPositions[2] = vec2(1, -1);	
+	quadPositions[1] = vec2(1, 1);
+	quadPositions[0] = vec2(-1, 1);
+	*/
+
 	emitPolygon(quadPositions, 4);
 }
 
 vec3 project(const vec4 v) {
-	return v.xyz / v.w;
+	return v.xyz / clamp(v.w,1,100000);
 }
 
 void getPositionsSimple(out vec2 positions[POINT_COUNT]) {
@@ -216,11 +227,19 @@ bool cull() {
 	mat4 m0 = view0Matrix4;
 	mat4 m1 = view1Matrix4;
 
+	bool do_cull = true;
+
 	for (int i = 0; i < 6; i++) {
-		if (project(m0 * vec4(geometryPosition[i], 1)).z > 0.0) return true;
-		if (project(m1 * vec4(geometryPosition[i], 1)).z > 0.0) return true;
+		if (project(m0 * vec4(geometryPosition[i], 1)).z > 0.0)
+		{
+			do_cull = false;
+		}
+		if (project(m1 * vec4(geometryPosition[i], 1)).z > 0.0)
+		{
+			do_cull = false;
+		}
 	}
-	return false;
+	return do_cull;
 }
 
 

@@ -23,6 +23,8 @@ RollingShutterRasteriser::RollingShutterRasteriser(ovrSizei fb)
 	m_resolution.x = fb.w;
 	m_resolution.y = fb.h;
 	useRaytracing = true;
+
+	rollOffset = 0.0f;
 }
 
 void RollingShutterRasteriser::Render(Scene* scene, ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection)
@@ -51,6 +53,8 @@ void RollingShutterRasteriser::Render(Scene* scene, ovrMatrix4f view0, ovrMatrix
 	glUniform1i(glGetUniformLocation(getProgram(), "useAdaptiveBounds"), useAdaptiveBounds ? 1 : 0);
 	glUniform2i(glGetUniformLocation(getProgram(), "resolution"), m_resolution.x, m_resolution.y);
 	glUniform1i(glGetUniformLocation(getProgram(), "useRaytracing"), useRaytracing ? 1 : 0);
+
+	glUniform1f(glGetUniformLocation(getProgram(), "rollOffset"), rollOffset);
 
 	for (size_t i = 0; i < scene->models.size(); ++i) {
 		Render(scene->models[i], view0, view1, projection);

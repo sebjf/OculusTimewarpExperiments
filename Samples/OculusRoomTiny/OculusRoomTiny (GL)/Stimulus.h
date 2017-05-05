@@ -27,9 +27,9 @@ public:
 		clock1 = 0;
 		clock2 = 0;
 		height1 = 3;
-		height2 = 0;
+		height2 = 1.0f;
 		speed1 = 0.025f;
-		speed2 = 0.01f;
+		speed2 = 0.06f;
 		lim1 = 1.5f;
 		lim2 = -1.5f;
 		multiplier = 1.0f;
@@ -43,7 +43,7 @@ public:
 		m_model->Pos = Vector3f(radius * (float)sin(clock1 + phase), height1 + height2 * (float)sin(clock2 + phase), radius * (float)cos(clock1 + phase));
 		m_model->Rot = Quatf(Vector3f(0, 0, -1), clock2);
 		m_model->Scale = 0.5f;
-		clock1 += speed1 * multiplier;
+		clock1 += GetSpeed();
 		clock2 += speed2;
 
 		m_model->Rot = Quatf::Align(m_model->Pos.Normalized(), Vector3f(0, 0, 1));
@@ -56,6 +56,16 @@ public:
 		{
 			speed1 *= -1;
 		}
+	}
+
+	float GetSpeed()	// positive means move to left, negative to the right (from pov of user facing backwards!)
+	{
+		return speed1 * multiplier;
+	}
+
+	float GetDirection()	// set to match dp, negative to left, positive to right
+	{
+		return (GetSpeed() < 0 ? -1.0f : 1.0f) * -1.0f;
 	}
 
 	int GetCharacterTexture(int i)

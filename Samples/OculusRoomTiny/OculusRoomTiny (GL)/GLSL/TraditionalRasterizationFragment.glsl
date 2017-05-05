@@ -10,6 +10,6 @@ out     vec4      FragColor;
 
 void main()
 {
-   FragColor = oColor * max(0.1, abs(dot(normalize(n.xyz), -normalize(v.xyz))) ) * texture2D(Texture0, oTexCoord).x;
+   FragColor = oColor * max(0.1, abs(dot(normalize(n.xyz), -normalize(v.xyz))) );// * texture2D(Texture0, oTexCoord).x;
    FragColor.a = 1.0;  
 };

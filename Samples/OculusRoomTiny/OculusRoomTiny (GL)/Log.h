@@ -44,6 +44,11 @@ protected:
 	void Step(LogEntry entry);
 
 	int numEntries;
+
+	virtual std::string GetHeader() 
+	{
+		return "v0";
+	}
 };
 
 class Logger2 : public Logger
@@ -55,11 +60,21 @@ public:
 	}
 	void Step(float time, int answer, int renderingcondition, Stimulus* stimuli);
 	int previousCharacterId;
+
+	virtual std::string GetHeader()
+	{
+		return "v2";
+	}
 };
 
 class Logger3 : public Logger
 {
 public:
-	void Step(float time, float error, int condition);
+	void Step(float time, Vector3f head, Vector3f box, int condition, float speed);
 	int previousCharacterId;
+
+	virtual std::string GetHeader()
+	{
+		return "v5";
+	}
 };

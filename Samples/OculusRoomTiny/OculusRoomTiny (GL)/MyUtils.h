@@ -167,7 +167,7 @@ public:
 
 	BlockedConditions(size_t total, size_t blocksize, Stimulus* stimulus)
 	{
-		size_t range = 2;
+		size_t range = 3;
 		size_t numblocks = total / blocksize;
 		size_t numblockseach = numblocks / range;
 
@@ -182,7 +182,6 @@ public:
 		}
 
 		std::random_shuffle(conditions_compressed.begin(), conditions_compressed.end());
-
 
 		std::vector<int> matching;
 		for (size_t i = 0; i < stimulus->characters.size(); i++)

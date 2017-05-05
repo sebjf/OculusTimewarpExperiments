@@ -60,6 +60,10 @@ enum RenderingCondition : int
 	RenderingCondition_ROL = 2
 };
 
+int	PARAM_time = 2;
+float PARAM_speedbase = 0.02f;
+float PARAM_speedvariance = 0.8f;
+
 RenderingCondition renderingCondition;
 
 /* Describes the predicted motion throughout an upcoming frame */
@@ -71,6 +75,7 @@ struct Prediction
 
 	Vector3f worldOffset;
 
+
 	Matrix4f GetView(int eye)
 	{
 		float Yaw(3.141592f);
@@ -81,6 +86,16 @@ struct Prediction
 		Vector3f shiftedEyePos = worldOffset + rollPitchYaw.Transform(EyeRenderPose[eye].Position);
 
 		return Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + finalForward, finalUp);
+	}
+
+	Vector3f GetForward()
+	{
+		float Yaw(3.141592f);
+		Matrix4f rollPitchYaw = Matrix4f::RotationY(Yaw);
+		Matrix4f finalRollPitchYaw = rollPitchYaw * Matrix4f(EyeRenderPose[0].Orientation);
+		Vector3f finalUp = finalRollPitchYaw.Transform(Vector3f(0, 1, 0));
+		Vector3f finalForward = finalRollPitchYaw.Transform(Vector3f(0, 0, -1));
+		return finalForward;
 	}
 };
 
@@ -100,6 +115,21 @@ Prediction GetPrediction(ovrSession session, ovrVector3f* HmdToEyeOffset, double
 	ovr_CalcEyePoses(hmdState.HeadPose.ThePose, HmdToEyeOffset, result.EyeRenderPose);
 
 	return result;
+}
+
+float GetDP_ZX(Vector3f v1, Vector3f v2)
+{
+	v1.y = 0;
+	v2.y = 0;
+	float sign = v1.Cross(v2).Normalized().Dot(Vector3f(0, 1, 0));	// left is negative, right is positive (right handed coordinate system)
+	return (1 - v1.Dot(v2)) * sign;
+}
+
+float GetDP_YZ(Vector3f v1, Vector3f v2)
+{
+	v1.x = 0;
+	v2.x = 0;
+	return v1.Dot(v2);
 }
 
 // return true to retry later (e.g. after display lost)
@@ -127,6 +157,7 @@ static bool MainLoop(bool retryCreate)
 	Logger3 log;
 
 	Prediction prediction0;
+	Prediction prediction;
 	Prediction prediction1;
 
     TextureBuffer * eyeRenderTexture[2] = { nullptr, nullptr };
@@ -223,12 +254,19 @@ static bool MainLoop(bool retryCreate)
 	// replace the default box with our own
 	roomScene->models[0] = ImportAssimpModel(assimpscene, 0);
 
+	Model* handbox = ImportAssimpModel(assimpscene, 0);
+	handbox->Pos.y -= 0.1f;
+
+	//roomScene->models.push_back(handbox);
+
 	RollingShutterRasteriser* rollingShutterRasteriser = new RollingShutterRasteriser(idealTextureSize);
 	TraditionalRasteriser* traditionalRasteriser = new TraditionalRasteriser();
 	Stimulus* stimuli = new Stimulus();
-	BlockedConditions* conditions = new BlockedConditions(30, 5, stimuli);
+	BlockedConditions* conditions = new BlockedConditions(40, 5, stimuli);
 
 	stimuli->m_model = roomScene->models[0];
+	stimuli->speed1 = PARAM_speedbase;
+	stimuli->speed2 = 0;
 
     // FloorLevel will give tracking poses where the floor height is 0
     ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
@@ -239,11 +277,20 @@ static bool MainLoop(bool retryCreate)
 
 	TimeTrigger timeTrigger;
 
+	TextureBuffer* reticleTexture = new TextureBuffer(session, true, true, Sizei(256,256), 1, NULL, 1);
+	glClearColor(0.4f, 0.4f, 0.9f, 1.0f);
+	reticleTexture->SetAndClearRenderSurface(NULL);
+	CLEAR();
+	reticleTexture->UnsetRenderSurface();
+	reticleTexture->Commit();
+
+	glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+
     // Main loop
     while (Platform.HandleMessages())
     {
         // Keyboard inputs to adjust player orientation
-        static float Yaw(3.141592f);
+        static float Yaw(0.f);
 
         // Keyboard inputs to adjust player position
         static Vector3f Pos2(0.0f,1.5f,-0.0f);
@@ -255,7 +302,8 @@ static bool MainLoop(bool retryCreate)
 		if (Platform.Key['1'])      enableAsyncTimewarp = true;		else enableAsyncTimewarp = false;
 		if (Platform.Key['2'])      enableRenderPose = true;		else enableRenderPose = false;
 		if (Platform.Key['3'])      enableRollingShutter = true;	else enableRollingShutter = false;
-		if (Platform.Key['4'])      enableClearScreen = true;		else enableClearScreen = false;
+		if (Platform.Key['4'])      renderingCondition = RenderingCondition_STD;
+		if (Platform.Key['5'])      enableClearScreen = true;		else enableClearScreen = false;
 
 		if (inputs[0].Update(Platform.Key[VK_NUMPAD8]).IsTriggered()) stimuli->speed2 += 0.01f;
 		if (inputs[1].Update(Platform.Key[VK_NUMPAD2]).IsTriggered()) stimuli->speed2 -= 0.01f;
@@ -276,15 +324,23 @@ static bool MainLoop(bool retryCreate)
 
 		if (!enableRenderPose) {
 			//	ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime)
-			prediction0 = GetPrediction(session, HmdToEyeOffset, 0);
+			prediction0 = GetPrediction(session, HmdToEyeOffset, -0.0065);
 			prediction0.worldOffset = Pos2;
-			prediction1 = GetPrediction(session, HmdToEyeOffset, 0.0133);
+			prediction  = GetPrediction(session, HmdToEyeOffset, 0.0);
+			prediction.worldOffset  = Pos2;
+			prediction1 = GetPrediction(session, HmdToEyeOffset, +0.0065);
 			prediction1.worldOffset = Pos2;
 		}
 
 		// Process the user input
 
 		userInput.Update(Platform.Key[VK_LEFT], Platform.Key[VK_RIGHT], Platform.Key[VK_UP], Platform.Key[VK_DOWN]);
+
+		static float phase = 0.0f;
+		phase = (float)Platform.MouseX * -0.004f + 2.0f;
+		handbox->Pos = Vector3f(stimuli->radius * (float)sin(phase), stimuli->height1, stimuli->radius * (float)cos(phase));
+		handbox->Scale = 0.5f;
+		handbox->Rot = Quatf();
 
 		// -------------------------------------------------------------
 
@@ -311,7 +367,7 @@ static bool MainLoop(bool retryCreate)
 
 		// -------------------------------------------------------------
 
-		/*
+	
 		float timeoffset = ((float)clock()) / CLOCKS_PER_SEC;
 
 		if (timeTrigger.IsTrigger(timeoffset, 6))
@@ -326,19 +382,17 @@ static bool MainLoop(bool retryCreate)
 			renderingCondition = (RenderingCondition)c.rasterisation;
 		}
 
-		if (timeTrigger.IsTrigger(timeoffset, 1))
+		if (timeTrigger.IsTrigger(timeoffset, PARAM_time))
 		{
-			stimuli->multiplier = 1.0f + (((float)(rand() % 100) / 100.0f) * 0.9f);
+			stimuli->multiplier = 1.0f + (((float)(rand() % 100) / 100.0f) * PARAM_speedvariance);
 		}		
 
 		if (isVisible)
 		{
-			Quatf orientation = Quatf(prediction0.EyeRenderPose->Orientation);
-			Vector3f lookat = orientation.Rotate(Vector3f(0, 0, 1));
-			float accuracy = lookat.Normalized().Dot(stimuli->m_model->Pos.Normalized());
-			log.Step(timeoffset, accuracy, (int)renderingCondition);
+			Vector3f v0 = prediction0.GetForward().Normalized();
+			Vector3f v2 = (stimuli->m_model->Pos - (Vector3f(prediction.EyeRenderPose->Position))).Normalized();
+			log.Step(timeoffset, v0, v2, (int)renderingCondition, stimuli->GetSpeed());
 		}
-		*/
 		
 
 		// -------------------------------------------------------------
@@ -369,7 +423,6 @@ static bool MainLoop(bool retryCreate)
 
 		stimuli->Update();
 
-		stimuli->speed2 = 0;
 
 		if (inputRenderDocCaptureFrame.IsTriggered() && hasRenderdoc)
 		{
@@ -383,17 +436,19 @@ static bool MainLoop(bool retryCreate)
 				// Switch to eye render target
 				eyeRenderTexture[eye]->SetAndClearRenderSurface(eyeDepthBuffer[eye]);
 
-				Matrix4f proj = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.2f, 10000.0f, ovrProjection_None);
+				Matrix4f proj = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.01f, 10000.0f, ovrProjection_None);
 
 				if (renderingCondition == RenderingCondition_STD || renderingCondition == RenderingCondition_ATW) 
 				{
 					// Render world (regular rasterisation or atw)
-					traditionalRasteriser->Render	(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
+					traditionalRasteriser->Render	(roomScene, prediction.GetView(eye), prediction.GetView(eye), proj);
 				}else
 				if(renderingCondition == RenderingCondition_ROL)
 				{
 					// Rolling Shutter Rasterisation
-					rollingShutterRasteriser->Render(roomScene, prediction0.GetView(eye), prediction0.GetView(eye), proj);
+					if (eye == 0) rollingShutterRasteriser->rollOffset = 0.5f;
+					if (eye == 1) rollingShutterRasteriser->rollOffset = 0.0f;
+					rollingShutterRasteriser->Render(roomScene, prediction0.GetView(eye), prediction1.GetView(eye), proj);
 				}
 
 				if (enableClearScreen) {
@@ -431,7 +486,7 @@ static bool MainLoop(bool retryCreate)
 
 			if (renderingCondition == RenderingCondition_ATW)
 			{
-				ld.RenderPose[eye] = prediction0.EyeRenderPose[eye];
+				ld.RenderPose[eye] = prediction.EyeRenderPose[eye];
 			}
 			else
 			{
@@ -441,11 +496,33 @@ static bool MainLoop(bool retryCreate)
 				ld.Header.Flags |= ovrLayerFlag_HeadLocked;
 			}
 
-            ld.SensorSampleTime  = prediction0.sensorSampleTime;
+            ld.SensorSampleTime  = prediction.sensorSampleTime;
         }
 
-        ovrLayerHeader* layers = &ld.Header;
-        ovrResult result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
+		ovrLayerQuad reticle;
+		reticle.Header.Type = ovrLayerType_Quad;
+		reticle.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft | ovrLayerFlag_HeadLocked;
+		reticle.ColorTexture = reticleTexture->TextureChain;
+		reticle.QuadPoseCenter.Position.x = 0.00f;
+		reticle.QuadPoseCenter.Position.y = 0.00f;
+		reticle.QuadPoseCenter.Position.z = -5.f;
+		reticle.QuadPoseCenter.Orientation.x = 0;
+		reticle.QuadPoseCenter.Orientation.y = 0;
+		reticle.QuadPoseCenter.Orientation.z = 0;
+		reticle.QuadPoseCenter.Orientation.w = 1;
+		// HUD is 50cm wide, 30cm tall.
+		reticle.QuadSize.x = 0.05f;
+		reticle.QuadSize.y = 0.05f;
+		// Display all of the HUD texture.
+		reticle.Viewport.Pos.x = 0;
+		reticle.Viewport.Pos.y = 0;
+		reticle.Viewport.Size.w = 256;
+		reticle.Viewport.Size.h = 256;
+
+		ovrLayerHeader *layerList[2];
+		layerList[0] = &ld.Header;
+		layerList[1] = &reticle.Header;
+        ovrResult result = ovr_SubmitFrame(session, frameIndex, nullptr, layerList, 2);
         // exit the rendering loop if submit returns an error, will retry on ovrError_DisplayLost
         if (!OVR_SUCCESS(result))
             goto Done;

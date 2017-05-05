@@ -23,6 +23,7 @@
 #include "OVR_CAPI_GL.h"
 #include <assert.h>
 #include <vector>
+#include <windowsx.h>
 
 using namespace OVR;
 
@@ -208,10 +209,20 @@ struct TextureBuffer
 
         glBindFramebuffer(GL_FRAMEBUFFER, fboId);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, curTexId, 0);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, dbuffer->texId, 0);
+		if (dbuffer != NULL) 
+		{
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, dbuffer->texId, 0);
+		}
 
         glViewport(0, 0, texSize.w, texSize.h);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		if (dbuffer != NULL) 
+		{
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		}
+		else
+		{
+			glClear(GL_COLOR_BUFFER_BIT);
+		}
         glEnable(GL_FRAMEBUFFER_SRGB);
     }
 
@@ -246,10 +257,18 @@ struct OGL
     int                     WinSizeH;
     GLuint                  fboId;
     HINSTANCE               hInstance;
+	int						MouseX;
+	int						MouseY;
+	int						MouseXDelta;
+	int						MouseYDelta;
 
     static LRESULT CALLBACK WindowProc(_In_ HWND hWnd, _In_ UINT Msg, _In_ WPARAM wParam, _In_ LPARAM lParam)
     {
         OGL *p = reinterpret_cast<OGL *>(GetWindowLongPtr(hWnd, 0));
+		if (p != NULL) {
+			p->MouseXDelta = 0;
+			p->MouseYDelta = 0;
+		}
         switch (Msg)
         {
         case WM_KEYDOWN:
@@ -261,6 +280,8 @@ struct OGL
         case WM_DESTROY:
             p->Running = false;
             break;
+		case WM_MOUSEMOVE:
+			p->OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
         default:
             return DefWindowProcW(hWnd, Msg, wParam, lParam);
         }
@@ -280,7 +301,11 @@ struct OGL
         WinSizeW(0),
         WinSizeH(0),
         fboId(0),
-        hInstance(nullptr)
+        hInstance(nullptr),
+		MouseX(0),
+		MouseY(0),
+		MouseXDelta(0),
+		MouseYDelta(0)
     {
 		// Clear input
 		for (int i = 0; i < sizeof(Key) / sizeof(Key[0]); ++i)
@@ -292,6 +317,14 @@ struct OGL
         ReleaseDevice();
         CloseWindow();
     }
+
+	void OnMouseMove(int pixelX, int pixelY, DWORD flags)
+	{
+		MouseXDelta = pixelX - MouseX;
+		MouseYDelta = pixelY - MouseY;
+		MouseX = pixelX;
+		MouseY = pixelY;
+	}
 
     bool InitWindow(HINSTANCE hInst, LPCWSTR title)
     {

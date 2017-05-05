@@ -66,10 +66,13 @@ PLEXUS_SLOT_UNIFORM(mat4, projectionMatrix4)
 PLEXUS_SLOT_UNIFORM(ivec2, resolution)
 PLEXUS_SLOT_UNIFORM(bool, useRaytracing)
 
+uniform float rollOffset;
+
 layout(location = 0) out vec4 FragColor; //http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
 
 mat4 mix(mat4 m0, mat4 m1, const float t) {
-	return m0 + t * (m1 - m0);
+	float t_eye = (t * 0.5) + rollOffset;
+	return m0 + t_eye * (m1 - m0);
 }
 
 mat4 getRollingViewMatrix(const float roll) {
@@ -124,16 +127,16 @@ bool intersectTri(const vec3 vertex0, const vec3 vertex1, const vec3 vertex2, co
 
 void main() {
 
-	float roll = float(gl_FragCoord.x) / float(resolution.x);
+	float roll = 1 - float(gl_FragCoord.x) / float(resolution.x);
 
 	Ray ray = getRollingRay(gl_FragCoord.xy, resolution, 0, roll);
 
-	float tBest = 100000;
+	float tBest = 1000000;
 	vec2 coordBest = vec2(0);
 	bool hit = intersectTri(
 		triPositions[0], triPositions[1], triPositions[2], ray, tBest, coordBest);
-//	hit = hit || intersectTri(
-//		triPositions[2], triPositions[0], triPositions[1], ray, tBest, coordBest);
+	hit = hit || intersectTri(
+		triPositions[2], triPositions[0], triPositions[1], ray, tBest, coordBest);
 
 	if (useRaytracing) {
 		if (!hit) discard;
@@ -143,10 +146,10 @@ void main() {
 		vec3 normal		= INTERPOLATE_BARYCENTRIC(triNormals[0], triNormals[1], triNormals[2], coordBest);
 		vec2 texcoord	= INTERPOLATE_BARYCENTRIC(triTexCoords[0], triTexCoords[1], triTexCoords[2], coordBest);
 
-		gl_FragDepth = tBest / 100000.0;
+		gl_FragDepth = tBest / 1000000.0;
 		//FragColor = color * texture2D(Texture0, texcoord).x;
-		//FragColor = color * max(0.1, dot(normalize(normal.xyz), -normalize(position.xyz)) ) * texture2D(Texture0, texcoord).x;
-		FragColor.xyz = normal.xyz;
+		FragColor = color * max(0.1, dot(normalize(normal.xyz), -normalize(position.xyz)) );// * texture2D(Texture0, texcoord).x;
+		//FragColor.xyz = normal.xyz;
 		FragColor.a = 1.0;  
 
 	} else {

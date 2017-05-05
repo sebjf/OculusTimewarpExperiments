@@ -7,6 +7,7 @@ class RollingShutterRasteriser : public Rasteriser
 public:
 	RollingShutterRasteriser(ovrSizei fb);
 	void Render(Scene* scene, ovrMatrix4f view0, ovrMatrix4f view1, ovrMatrix4f projection);
+	float rollOffset;
 
 protected:
 
@@ -19,6 +20,8 @@ protected:
 	bool useAdaptiveBounds;
 	ovrVector2i m_resolution;
 	bool useRaytracing;
+
+
 
 private:
 	GLint getProgram()
